@@ -1,213 +1,28 @@
 #include "main.h"
-#include "lemlib/api.hpp" // IWYU pragma: keep
-#include "lemlib/chassis/chassis.hpp"
-#include "lemlib/chassis/trackingWheel.hpp"
-#include "pros/adi.hpp"
-#include "pros/misc.h"
-#include "pros/motors.h"
-#include "pros/optical.hpp"
 
+/////
+// For installation, upgrading, documentations, and tutorials, check out our website!
+// https://ez-robotics.github.io/EZ-Template/
+/////
 
-pros::MotorGroup left_motors({-9, -8, -10},pros::MotorGear::blue);
-pros::MotorGroup right_motors({18, 19, 20},pros::MotorGear::blue);
+// Chassis constructor
+ez::Drive chassis(
+    // These are your drive motors, the first motor is used for sensing!
+    {11, -12, -13},     // Left Chassis Ports (negative port will reverse it!)
+    {-19, 18, 17},  // Right Chassis Ports (negative port will reverse it!)
 
-// drivetrain settings
-lemlib::Drivetrain drivetrain(&left_motors, // left motor group
-                              &right_motors, // right motor group
-                              12.565,
-                              lemlib::Omniwheel::NEW_275, // using new 4" omnis
-                              450, // drivetrain rpm is 360
-                              8 // horizontal drift is 2 (for now)
-);
-pros::Imu imu(4);
-lemlib::OdomSensors sensors(nullptr, // vertical tracking wheel 1, set to null
-                            nullptr, // vertical tracking wheel 2, set to nullptr as we are using IMEs
-                            nullptr, // horizontal tracking wheel 1
-                            nullptr, // horizontal tracking wheel 2, set to nullptr as we don't have a second one
-                            &imu // inertial sensor
-);
-// lateral PID controller
-lemlib::ControllerSettings lateral_controller(10, // proportional gain (kP)
-                                              0, // integral gain (kI)
-                                              3, // derivative gain (kD)
-                                              3, // anti windup
-                                              1, // small error range, in inches
-                                              100, // small error range timeout, in milliseconds
-                                              3, // large error range, in inches
-                                              500, // large error range timeout, in milliseconds
-                                              20 // maximum acceleration (slew)
-);
+    9,      // IMU Port
+    2.75,  // Wheel Diameter (Remember, 4" wheels without screw holes are actually 4.125!)
+    450);   // Wheel RPM = cartridge * (motor gear / wheel gear)
 
-// angular PID controller
-lemlib::ControllerSettings angular_controller(2, // proportional gain (kP)
-                                              0, // integral gain (kI)
-                                              10, // derivative gain (kD)
-                                              3, // anti windup
-                                              1, // small error range, in degrees
-                                              100, // small error range timeout, in milliseconds
-                                              3, // large error range, in degrees
-                                              500, // large error range timeout, in milliseconds
-                                              0 // maximum acceleration (slew)
-);
-lemlib::Chassis chassis(drivetrain, // drivetrain settings
-                        lateral_controller, // lateral PID settings
-                        angular_controller, // angular PID settings
-                        sensors // odometry sensors
-);
+// Uncomment the trackers you're using here!
+// - `8` and `9` are smart ports (making these negative will reverse the sensor)
+//  - you should get positive values on the encoders going FORWARD and RIGHT
+// - `2.75` is the wheel diameter
+// - `4.0` is the distance from the center of the wheel to the center of the robot
+// ez::tracking_wheel horiz_tracker(8, 2.75, 4.0);  // This tracking wheel is perpendicular to the drive wheels
+// ez::tracking_wheel vert_tracker(9, 2.75, 4.0);   // This tracking wheel is parallel to the drive wheels
 
-pros::Controller master(pros::E_CONTROLLER_MASTER);
-
-//Motor for subsystems
-pros::Motor hookIntake(2,pros::MotorGear::blue);
-pros::Motor floatingIntake(-3,pros::MotorGear::blue);
-pros::Motor ladyBrown(12,pros::MotorGear::green);
-
-//sensors
-pros::Rotation ladyBrownRotation(15);
-pros::Optical colorSorter(13);
-pros::Rotation hookRotation(14);
-
-//Pneumatics
-pros::adi::DigitalOut mogoMech('a', false);
-pros::adi::DigitalOut doinker('b', false);
-pros::adi::DigitalOut ringRush('c', false);
-bool enableMogoMech = false;
-
-//Variables
-int autonSelection = 0;
-bool auto_started = false;
-int alliance = 0;
-
- void intakeMove(double voltage) {
-    hookIntake.move(voltage);
-    floatingIntake.move(voltage);
-  }
-  void intakeBrake() {
-    hookIntake.brake();
-    floatingIntake.brake();
-  }
-
-//Left button
-void left_button() {
-	static bool pressed1=false;
-	pressed1 = !pressed1;
-	if (pressed1) {
-		autonSelection--; 
-	} else if (autonSelection ==-1) {
-		autonSelection =8;
-	}
-	//if left button pressed selection subtracts one
-}
-
-//Right Button
-void right_button() {
-	static bool pressed2 = false;
-	pressed2 = !pressed2;
-	if(pressed2) {
-		autonSelection++;
-	} else if (autonSelection ==9) {
-		autonSelection =0;
-	}
-	// if right button pressed selection adds one
-}
-
-void center_button() {
-	static bool pressed = false;
-	pressed = !pressed;
-	if(pressed) {
-		alliance++;
-	} else if (alliance > 1) {
-		alliance = 0;
-	}
-}
-
-//PD Loop Code
-const int numStates = 3;
-int states[numStates] = {0,250,500};
-int currState =0;
-double target1 = 0;
-
-void nextState () {
-  currState += 1;
-  if (currState ==3) {
-    currState = 0;
-  }
-  target1 = states[currState];
-}
-
-void liftControl() {
-  double kP1 = 5;
-  double kD1 = 5;
-  double prevError1 = 0;
-  double error1 = target1 - ladyBrown.get_position();
-  double derivative1 = error1 - prevError1;
-  double motorVoltage1 = ((kP1 * error1)+(kD1 * derivative1)) / 12;
-  ladyBrown.move(motorVoltage1);
-}
-
-//color sorting code loop
-void colorSorting () {
-    if (alliance ==0) {
-      if (colorSorter.get_hue() < 265 & colorSorter.get_hue() > 190) {
-        if (currState ==1) {
-          currState =0;
-          pros::delay(265);
-          intakeMove(-127);
-          pros::delay(100);
-          intakeBrake();
-          currState =1;
-        } else {
-          pros::delay(250);
-          intakeMove(-127);
-          pros::delay(100);
-          intakeBrake();
-        }
-      }
-    } else if (alliance ==1) {
-      if (colorSorter.get_hue() > 330 || colorSorter.get_hue() < 30) {
-        if (currState ==1) {
-          currState =0;
-          pros::delay(265);
-          intakeMove(-127);
-          pros::delay(100);
-          intakeBrake();
-          currState =1;
-        } else {
-          pros::delay(250);
-          intakeMove(-127);
-          pros::delay(100);
-          intakeBrake();
-        }
-      }
-    }
-}
-
-//variables for PD loop
-/*double kP = 1;
-double kD = 1;
-double maxVoltage =80;
-
-//PD variables
-int error = 0; //Sensor value - target value 
-int prevError = 0; //Error 20 msec ago
-int derivative =0; //Error - prevError
-
-void ladyBrownPD (double target) {
-  while (1) {
-    error = target - ladyBrown.get_position();
-		derivative = error - prevError;
-
-		double motorVoltage = (error * kP + derivative * kD) / 12; //change it -12 if spins reverse
-
-    if (motorVoltage > maxVoltage) {
-      ladyBrown.move(maxVoltage);
-    } else {
-      ladyBrown.move(motorVoltage);
-    }
-		prevError = error;
-		pros::delay(10);
-  }
-} */
 
 /**
  * Runs initialization code. This occurs as soon as the program is started.
@@ -216,681 +31,277 @@ void ladyBrownPD (double target) {
  * to keep execution time for this mode under a few seconds.
  */
 void initialize() {
-	pros::lcd::initialize();
-	chassis.calibrate();
-	chassis.setPose(0,0,0);
-  
-	//sets brake modes
-	ladyBrown.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD);
-	hookIntake.set_brake_mode(pros::E_MOTOR_BRAKE_COAST);
-  floatingIntake.set_brake_mode(pros::E_MOTOR_BRAKE_COAST);
-  chassis.setBrakeMode(pros::E_MOTOR_BRAKE_HOLD);
-	//starts brain screen buttons
-  pros::lcd::register_btn0_cb(left_button);
-	pros::lcd::register_btn1_cb(center_button);
-	pros::lcd::register_btn2_cb(right_button);
+  // Print our branding over your terminal :D
+  ez::ez_template_print();
 
+  pros::delay(500);  // Stop the user from doing anything while legacy ports configure
+  chassis.pid_targets_reset();                // Resets PID targets to 0
+  chassis.drive_imu_reset();                  // Reset gyro position to 0
+  chassis.drive_sensor_reset();               // Reset drive sensors to 0
+  chassis.drive_brake_set(MOTOR_BRAKE_HOLD);  // Set motors to hold.  This helps autonomous consistency
+
+  //sets rotation  sensor to zero  position and sets it reversed
+  ladyBrownRotation.reset_position();
+  ladyBrownRotation.set_reversed(true);
+
+  // Configure your chassis controls
+  chassis.opcontrol_curve_buttons_toggle(true);   // Enables modifying the controller curve with buttons on the joysticks
+  chassis.opcontrol_drive_activebrake_set(0.0);   // Sets the active brake kP. We recommend ~2.  0 will disable.
+  chassis.opcontrol_curve_default_set(0.0, 0.0);  // Defaults for curve. If using tank, only the first parameter is used. (Comment this line out if you have an SD card!)
+
+  // Set the drive to your own constants from autons.cpp!
+  default_constants();
+
+  // Autonomous Selector using LLEMU
+  ez::as::auton_selector.autons_add({
+      {"Skills\n\nSkills Auton", rightAutonElim},
+      {"Right Solo AWP\n\nRight side any alliance solo AWP", rightSoloAWP},
+      {"Left Solo AWP\n\nLeft side any alliance solo AWP", leftSoloAWP},
+      {"Ring Rush\n\nRed Solo AWP", ringRushLeft_soloAWP},
+      {"Ring Rush\n\nBlue Solo AWP", ringRushRight_soloAWP},
+      {"Ring Rush\n\nRed Elim Auton",ringRushLeft_ElimAuton},
+      {"Ring Rush\n\nBlue Elim Auton",ringRushRight_ElimAuton},
+      {"Right Goal Rush\n\nRight Goal Rush", rightGoalRush_soloAWP},
+      {"Left Goal Rush\n\nLeft Goal Rush", leftGoalRush_soloAWP},
+        /*{"Drive\n\nDrive forward 24 inches", drive_example},
+        {"Turn\n\nTurn 45 degrees", turn_example},
+        {"Drive and Turn\n\nDrive forward 24 inches and turn 45 degrees", drive_and_turn},
+        {"Wait Until\n\nDrive forward and change speed after 12 inches", wait_until_change_speed},
+        {"Swing\n\nDrive forward and swing right 45 degrees", swing_example},
+        {"Motion Chaining\n\nDrive forward, turn, and come back, but blend everything together :D", motion_chaining},
+        {"Combine all 3 movements", combining_movements},
+        {"Interference\n\nAfter driving forward, robot performs differently if interfered or not", interfered_example},
+        {"Simple Odom\n\nThis is the same as the drive example, but it uses odom instead!", odom_drive_example},
+        {"Pure Pursuit\n\nGo to (0, 30) and pass through (6, 10) on the way.  Come back to (0, 0)", odom_pure_pursuit_example},
+        {"Pure Pursuit Wait Until\n\nGo to (24, 24) but start running an intake once the robot passes (12, 24)", odom_pure_pursuit_wait_until_example},
+        {"Boomerang\n\nGo to (0, 24, 45) then come back to (0, 0, 0)", odom_boomerang_example},
+        {"Boomerang Pure Pursuit\n\nGo to (0, 24, 45) on the way to (24, 24) then come back to (0, 0, 0)", odom_boomerang_injected_pure_pursuit_example},
+        {"Measure Offsets\n\nThis will turn the robot a bunch of times and calculate your offsets for your tracking wheels.", measure_offsets}, */
+  });
+
+  // Initialize chassis and auton selector
+  chassis.initialize();
+  ez::as::initialize();
+  master.rumble(chassis.drive_imu_calibrated() ? "." : "---");
+
+  // Starts Lady Brown PD Loop Control
   pros::Task liftControlTask([]{
     while (true) {
       liftControl();
       pros::delay(10);
     }
-  });
-
-  pros::Task colorSort([] {
-    while (true) {
-      colorSorting();
-      pros::delay(10);
-    }
-  });
-}
-
-//moving functions
-  void moveToPoint(float x, float y, int timeout, lemlib::MoveToPointParams params = {}, bool async = true) {
-   chassis.moveToPoint(x, y, timeout, params, async );
-  }
-  void moveToPose(float x, float y, float theta, int timeout, lemlib::MoveToPoseParams params = {}, bool async = true) {
-   chassis.moveToPose(x, y, theta, timeout, params, async);
-  }
-
-//turning & swinging functions NO PARAMETERS
-  void turnToPoint(float x, float y, int timeout, lemlib::TurnToPointParams params = {}, bool async = true) {
-    chassis.turnToPoint(x, y, timeout, params, async);
-  }
-  void turnToHeading(float theta, int timeout, lemlib::TurnToHeadingParams params = {}, bool async = true) {
-    chassis.turnToHeading(theta, timeout, params, async);
-  }
-  void swingToHeading(float theta, DriveSide lockedSide, int timeout, lemlib::SwingToHeadingParams params = {}, bool async = true) {
-    chassis.swingToHeading(theta, lockedSide, timeout, params, async);
-  }
-  void swingToPoint(float x, float y, DriveSide lockedSide, int timeout, lemlib::SwingToPointParams params = {}, bool async = true) {
-    chassis.swingToPoint(x, y, lockedSide, timeout, params, async);
-  }
-
-//wait until movement done
-  void wait() {
-   chassis.waitUntilDone();
-  }
-
-void disabled() {
-}
-
-
-//auton selecter & alliance color
-void competition_initialize() {
-  while (!auto_started) {	 // while auton isn't started
-	switch(autonSelection) { // uses left and right buttons it change auton selection
-      case 0:
-        pros::lcd::set_text(1,"Forward/Backward Tuning");
-        break;
-      case 1:
-        pros::lcd::set_text(1,"Right/Left Tuning");
-        break;
-      case 2:
-        pros::lcd::set_text(1, "Right Side");
-        pros::lcd::set_text(2, "1 Mobile Goal, 2 Rings");
-        break;
-      case 3:
-        pros::lcd::set_text(1, "Right Side Solo AWP");
-        pros::lcd::set_text(2, "1 Mobile Goal, 1 Alliance Stake, 3 Rings");
-        break;
-      case 4:
-        pros::lcd::set_text(1, "Ring Rush");
-        pros::lcd::set_text(2, "Red Alliance Solo AWP");
-        pros::lcd::set_text(3, "1 Mobile Goal, 1 Alliance Stake, 4 Rings");
-        break;
-      case 5:
-        pros::lcd::set_text(1, "Ring Rush");
-        pros::lcd::set_text(2, "Blue Alliance Solo AWP");
-        pros::lcd::set_text(3, "1 Mobile Goal, 1 Alliance Stake, 4 Rings");
-        break;
-      case 6:
-        pros::lcd::set_text(1, "Ring Rush");
-        pros::lcd::set_text(2, "Red Alliance Elim Auton");
-        pros::lcd::set_text(3, "1 Mobile Goal, 5 Rings");
-        break;
-      case 7:
-        pros::lcd::set_text(1, "Ring Rush");
-        pros::lcd::set_text(2, "Blue Alliance Elim Auton");
-        pros::lcd::set_text(3, "1 Mobile Goal, 5 Rings");
-        break;
-      case 8:
-        pros::lcd::set_text(1, "Skills Auton");
-        break;
-    }
-    switch (alliance) {
-      case 0: 
-       pros::lcd::set_text(5,"Alliance Color is RED");
-       break;
-      case 1:
-       pros::lcd::set_text(5,"Alliance Color is BLUE");
-       break;
-    }
-	pros::delay(15); 
-   }
-}
-
-
-//Autonomous Program Functions
-void forwardBackwardTuning () {
-  moveToPoint(0,10,1000);
-  wait();
-  moveToPoint(0,0,1000);
-  wait();
-}
-
-void turningTuning () {
-  turnToHeading(90,1000);
-  wait();
-  turnToHeading(45,1000);
-  wait();
-  turnToHeading(0,1000);
-  wait();
-  }
-
-void skillsAuton () {
-chassis.setPose(0, 0, 0);
-hookIntake.move(127);
-pros::delay(500);
-hookIntake.brake();
-moveToPoint(0, 12, 1000);
-wait();
-moveToPoint(-23.55, 12, 1000, {.forwards = false});
-wait();
-mogoMech.set_value(true);
-pros::delay(100);
-moveToPoint(-23.55, 36, 1000);
-intakeMove(127);
-wait();
-moveToPose(-47.57, 82.9, 0,1000);
-currState = 1;
-wait();
-moveToPose(-40.1, 58, -90,1000);
-wait();
-intakeBrake();
-floatingIntake.move(127);
-moveToPoint(-58.9, 58, 1000);
-wait();
-currState = 2;
-pros::delay(500);
-currState = 0;
-pros::delay(500);
-floatingIntake.brake();
-pros::delay(10);
-intakeMove(127);
-pros::delay(100);
-moveToPose(-48.3, 36.28, 180, 1000, {.minSpeed = 65, .earlyExitRange = 5});
-moveToPose(-48.3, 1, 180, 1000);
-wait();
-moveToPoint(-59.1, 12.5, 1000);
-wait();
-moveToPoint(-62.23, 1.68, 1000, {.forwards = false});
-pros::delay(100);
-intakeBrake();
-wait();
-mogoMech.set_value(false);
-pros::delay(100);
-moveToPoint(-7.7, 12, 1000);
-wait();
-moveToPoint(22.34, 12, 1000,{.forwards = false});
-wait();
-mogoMech.set_value(true);
-pros::delay(100);
-intakeMove(127);
-moveToPoint(22.34, 36, 1000);
-wait();
-moveToPose(46.13, 83, 0, 1000);
-currState = 1;
-wait();
-moveToPose(40.125, 58, 0, 1000);
-wait();
-intakeBrake();
-pros::delay(10);
-floatingIntake.move(127);
-moveToPoint(58.9, 58, 1000);
-wait();
-currState = 2;
-pros::delay(500);
-currState = 0;
-pros::delay(500);
-intakeMove(127);
-moveToPose(46.9, 36, 180, 1000, {.minSpeed = 65, .earlyExitRange = 5});
-moveToPose(46.9, 1, 180, 1000);
-wait();
-moveToPoint(57.66, 11.5, 1000);
-wait();
-moveToPoint(60, 1.25, 1000);
-pros::delay(100);
-intakeBrake();
-wait();
-mogoMech.set_value(false);
-pros::delay(100);
-moveToPose(25, 81.2, -45, 1000);
-floatingIntake.move(127);
-wait();
-moveToPose(0, 102.47, -45, 1000, {.forwards = false});
-wait();
-mogoMech.set_value(true);
-pros::delay(100);
-moveToPoint(-24.267, 82.5, 1000);
-intakeMove(127);
-wait();
-moveToPose(-47.573, 105.117, 0, 1000, {.minSpeed = 65, .earlyExitRange = 5});
-moveToPose(-47.573, 118.812, 0, 1000);
-wait();
-moveToPoint(-59.106, 106.799, 1000);
-wait();
-moveToPoint(-60.307, 117.01, 1000);
-pros::delay(100);
-intakeBrake();
-wait();
-mogoMech.set_value(false);
-pros::delay(100);
-moveToPose(-20.183, 103.796, 45, 1000, {.minSpeed = 65, .earlyExitRange = 5});
-moveToPose(13.215, 115.569, -90, 1000, {.forwards = false});
-wait();
-mogoMech.set_value(true);
-pros::delay(100);
-moveToPoint(22.825, 120.855, 1000, {.forwards = false});
-wait();
-moveToPoint(60.307, 122.537, 1000, {.forwards = false});
-wait();
-mogoMech.set_value(false);
-pros::delay(100);
-moveToPoint(15,122.537,1000);
-}
-
-void twoRingRightSide () {
-  chassis.setPose(0,0,-90);
-  moveToPoint(-17,0,1000);
-  wait();
-  turnToHeading(0,1000);
-  wait();
-  moveToPoint(-17,-8.5,1000,{.forwards = false});
-  wait();
-  intakeMove(127);
-  pros::delay(500);
-  intakeBrake();
-  moveToPoint(-17,0.6,1000);
-  wait();
-  turnToHeading(-90,1000);
-  wait();
-  moveToPoint(5,0.6,1000,{.forwards = false});
-  wait();
-  turnToHeading(-152.5,1000);
-  wait();
-  moveToPoint(31,24.6,1000,{.forwards = false});
-  wait();
-  mogoMech.set_value(true);
-  pros::delay(100);
-  turnToHeading(90,1000);
-  intakeMove(127);
-  wait();
-  moveToPoint(55,23.6,1000);
-  wait();
-  turnToHeading(-90,1000);
-  wait();
-  moveToPoint(17,23.6,1000);
-  wait();
-  intakeBrake();
-  enableMogoMech = true;
-}
-
-void soloAWP () {
-  chassis.setPose(0, 0, 180);
-  moveToPoint(0, 29.616, 1000,{.forwards = false, .maxSpeed = 80});
-  pros::delay(1200);
-  mogoMech.set_value(false);
-  pros::delay(100);
-  intakeMove(127);
-  //pros::delay(500);
-  moveToPose(23.383, 29, 90,1000);
-  wait();
-  //pros::delay(150);
-  moveToPose(-9.646, 20, -110,1000);
-  wait();
-  doinker.set_value(true);
-  pros::delay(150);
-  moveToPose(0, 23, -110,1000);
-  wait();
-  doinker.set_value(false);
-  moveToPose(-9, 3, -130, 1000);
-  pros::delay(600);
-  intakeBrake();
-  moveToPose(-10.5, 0, -90,1000);
-  wait();
-  turnToHeading(0,1000);
-  wait();
-  moveToPoint(-10.5, -3, 1000, {.forwards = false});
-  wait();
-  moveToPoint(-10.5,-1.5,1000);
-  wait();
-  intakeMove(127);
-  pros::delay(500);
-  intakeBrake();
-  moveToPoint(-10.5,20,1000);
-  enableMogoMech = false;
-}
-
-void ringRushLeft_soloAWP () {
-  chassis.setPose(0, 0, 0);
-  turnToHeading(-27,1000);
-  wait();
-  moveToPoint(-18.773, 43.269, 1000);
-  ringRush.set_value(true);
-  wait();
-  moveToPose(-13.965, 32.967, 0, 1000, {.forwards = false, .minSpeed = 65, .earlyExitRange = 3});
-  moveToPose(-13.965, 20.833, 0, 1000, {.forwards = false});
-  wait();
-  ringRush.set_value(false);
-  pros::delay(250);
-  moveToPoint(0.229, 33.196, 1000, {.forwards = false});
-  wait();
-  mogoMech.set_value(true);
-  pros::delay(100);
-  intakeMove(127);
-  moveToPoint(-24.268, 33.196, 1000);
-  wait();
-  moveToPose(7.326, 2, -207, 1000);
-  wait();
-  pros::delay(250);
-  intakeBrake();
-  pros::delay(10);
-  floatingIntake.move(-127);
-  moveToPoint(32.967, 2, 1000);
-  wait();
-  floatingIntake.brake();
-  moveToPoint(24.039, 2, 1000);
-  wait();
-  turnToHeading(0, 1000);
-  wait();
-  hookIntake.move(127);
-  pros::delay(500);
-  moveToPoint(24.039, 44, 1000);
-  enableMogoMech = false;
-  hookIntake.brake();
-}
-
-void ringRushRight_soloAWP () {
-  chassis.setPose(0, 0, 0);
-  turnToHeading(27,1000);
-  wait();
-  moveToPoint(18.773, 43.269, 1000);
-  ringRush.set_value(true);
-  wait();
-  moveToPose(13.965, 32.967, 0, 1000,{.forwards = false, .minSpeed = 65, .earlyExitRange = 3});
-  moveToPose(13.965, 20.833, 0, 1000, {.forwards = false});
-  wait();
-  ringRush.set_value(false);
-  pros::delay(250);
-  moveToPoint(-0.229, 33.196, 1000, {.forwards = false});
-  wait();
-  mogoMech.set_value(true);
-  pros::delay(100);
-  intakeMove(127);
-  moveToPoint(24.268, 33.196, 1000);
-  wait();
-  moveToPose(-7.326, 2, -207, 1000);
-  wait();
-  pros::delay(250);
-  intakeBrake();
-  floatingIntake.move(-127);
-  moveToPoint(-32.967, 2, 1000);
-  wait();
-  floatingIntake.brake();
-  moveToPoint(-24.039, 2, 1000);
-  wait();
-  turnToHeading(0, 1000);
-  wait();
-  hookIntake.move(127);
-  pros::delay(500);
-  hookIntake.brake();
-  moveToPoint(-24.039, 44, 1000);
-  enableMogoMech = false;
-}
-
-void ringRushLeft_ElimAuton () {
-  chassis.setPose(0, 0, 0);
-  turnToHeading(-27,1000);
-  wait();
-  moveToPoint(-18.773, 43.269, 1000);
-  ringRush.set_value(true);
-  wait();
-  moveToPose(-13.965, 32.967, 0, 1000, {.forwards = false, .minSpeed = 65, .earlyExitRange = 3});
-  moveToPose(-13.965, 20.833, 0, 1000, {.forwards = false});
-  wait();
-  ringRush.set_value(false);
-  pros::delay(250);
-  moveToPoint(0.229, 33.196, 1000, {.forwards = false});
-  wait();
-  mogoMech.set_value(true);
-  pros::delay(100);
-  intakeMove(127);
-  moveToPoint(-24.268, 33.196, 1000);
-  wait();
-  moveToPose(-45, 2, 225, 1000);
-  wait();
-  moveToPose(-42,5,225,1000);
-  wait();
-  moveToPose(-45,5,225,1000);
-  wait();
-  moveToPose(7.326,2,90,1000);
-  wait();
-  enableMogoMech = true;
-  moveToPose(72,10,90,1000);
-  wait();
-}
-
-void ringRushRight_ElimAuton () {
-  chassis.setPose(0, 0, 0);
-  turnToHeading(27,1000);
-  wait();
-  ringRush.set_value(true);
-  moveToPoint(18.773, 43.269, 1000);
-  wait();
-  moveToPose(13.965, 32.967, 0, 1000, {.forwards = false, .minSpeed = 65, .earlyExitRange = 3});
-  moveToPose(13.965, 20.833, 0, 1000, {.forwards = false});
-  wait();
-  ringRush.set_value(false);
-  pros::delay(250);
-  moveToPoint(-0.229, 33.196, 1000, {.forwards = false});
-  wait();
-  mogoMech.set_value(true);
-  pros::delay(100);
-  intakeMove(127);
-  moveToPoint(24.268, 33.196, 1000);
-  wait();
-  moveToPose(45, 2, 225, 1000);
-  wait();
-  moveToPose(42,5,225,1000);
-  wait();
-  moveToPose(45,5,225,1000);
-  wait();
-  moveToPose(-7.326,2,90,1000);
-  wait();
-  enableMogoMech = true;
-  moveToPose(-72,10,90,1000);
-  wait();
-}
-
-void rightGoalRush_soloAWP () {
-  chassis.setPose(0, 0, 0);
-  moveToPoint(0, 17.54, 1000);
-  wait();
-  floatingIntake.move(127);
-  moveToPoint(24.507, 25.95, 1000, {.minSpeed = 65, .earlyExitRange = 5});
-  moveToPose(21.624, 44.69, 0, 1000);
-  floatingIntake.brake();
-  wait();
-  doinker.set_value(true);
-  pros::delay(250);
-  moveToPoint(21.624, 27.871, 1000, {.forwards = false});
-  wait();
-  doinker.set_value(false);
-  moveToPoint(21.624, 40.969, 1000, {.forwards = false});
-  wait();
-  mogoMech.set_value(true);
-  pros::delay(100);
-  moveToPoint(36.389, 9.37, 1000, {.forwards = false});
-  intakeMove(127);
-  pros::delay(1000);
-  intakeBrake();
-  mogoMech.set_value(false);
-  pros::delay(100);
-  moveToPose(36.389, 34.167, 0, 1000, {.minSpeed = 65, .earlyExitRange = 12});
-  moveToPose(5.046, 38.683, -90, 1000, {.forwards = false});
-  wait();
-  mogoMech.set_value(true);
-  pros::delay(100);
-  moveToPoint(-24, 14.416, 1000);
-  intakeMove(127);
-  wait();
-  intakeBrake();
-  moveToPoint(-24, 24, 1000);
-}
-
-void leftGoalRush_soloAWP () {
-  chassis.setPose(0, 0, 0);
-  moveToPoint(0, 17.54, 1000);
-  wait();
-  floatingIntake.move(127);
-  moveToPoint(-24.507, 25.95, 1000, {.minSpeed = 65, .earlyExitRange = 5});
-  moveToPose(-21.624, 44.69, 0, 1000);
-  floatingIntake.brake();
-  wait();
-  doinker.set_value(true);
-  pros::delay(250);
-  moveToPoint(-21.624, 27.871, 1000, {.forwards = false});
-  wait();
-  doinker.set_value(false);
-  moveToPoint(-21.624, 40.969, 1000, {.forwards = false});
-  wait();
-  mogoMech.set_value(true);
-  pros::delay(100);
-  moveToPoint(-36.389, 9.37, 1000, {.forwards = false});
-  intakeMove(127);
-  pros::delay(1000);
-  intakeBrake();
-  mogoMech.set_value(false);
-  pros::delay(100);
-  moveToPose(-36.389, 34.167, 0, 1000, {.minSpeed = 65, .earlyExitRange = 12});
-  moveToPose(-5.046, 38.683, 90, 1000, {.forwards = false});
-  wait();
-  mogoMech.set_value(true);
-  pros::delay(100);
-  moveToPoint(24, 14.416, 1000);
-  intakeMove(127);
-  wait();
-  intakeBrake();
-  moveToPoint(24, 24, 1000);
-}
-
-//Autonomous program
-void autonomous() {
-  auto_started = true;
-  switch (autonSelection) {
-    case 0:
-     forwardBackwardTuning();
-    break;
-
-    case 1:
-    turningTuning();
-    break;
-
-    case 2:
-    twoRingRightSide();
-    break;
-
-    case 3:
-    soloAWP();
-    break;
-
-    case 4: 
-    ringRushLeft_soloAWP();
-    break;
-
-    case 5:
-    ringRushRight_soloAWP();
-    break;
-
-    case 6:
-    ringRushLeft_ElimAuton();
-    break;
-
-    case 7:
-    ringRushRight_ElimAuton();
-    break;
-
-    case 8: 
-    skillsAuton();
-    break;
-
-    case 9:
-    rightGoalRush_soloAWP();
-    break;
-
-    case 10: 
-    leftGoalRush_soloAWP();
-    break;
-  }
+  }); 
 }
 
 /**
+ * Runs while the robot is in the disabled state of Field Management System or
+ * the VEX Competition Switch, following either autonomous or opcontrol. When
+ * the robot is enabled, this task will exit.
+ */
+void disabled() {
+  // . . .
+}
+
+/**
+ * Runs after initialize(), and before autonomous when connected to the Field
+ * Management System or the VEX Competition Switch. This is intended for
+ * competition-specific initialization routines, such as an autonomous selector
+ * on the LCD.
+ *
+ * This task will exit when the robot is enabled and autonomous or opcontrol
+ * starts.
+ */
+void competition_initialize() {
+  // . . .
+}
+
+void autonomous() {
+  /*
+  Odometry and Pure Pursuit are not magic
+
+  It is possible to get perfectly consistent results without tracking wheels,
+  but it is also possible to have extremely inconsistent results without tracking wheels.
+  When you don't use tracking wheels, you need to:
+   - avoid wheel slip
+   - avoid wheelies
+   - avoid throwing momentum around (super harsh turns, like in the example below)
+  You can do cool curved motions, but you have to give your robot the best chance
+  to be consistent
+  */
+
+  ez::as::auton_selector.selected_auton_call();  // Calls selected auton from autonomous selector
+}
+
+/**
+ * Simplifies printing tracker values to the brain screen
+ */
+void screen_print_tracker(ez::tracking_wheel *tracker, std::string name, int line) {
+  std::string tracker_value = "", tracker_width = "";
+  // Check if the tracker exists
+  if (tracker != nullptr) {
+    tracker_value = name + " tracker: " + util::to_string_with_precision(tracker->get());             // Make text for the tracker value
+    tracker_width = "  width: " + util::to_string_with_precision(tracker->distance_to_center_get());  // Make text for the distance to center
+  }
+  ez::screen_print(tracker_value + tracker_width, line);  // Print final tracker text
+}
+
+/**
+ * Ez screen task
+ * Adding new pages here will let you view them during user control or autonomous
+ * and will help you debug problems you're having
+ */
+void ez_screen_task() {
+  while (true) {
+    // Only run this when not connected to a competition switch
+    if (!pros::competition::is_connected()) {
+      // Blank page for odom debugging
+      if (chassis.odom_enabled() && !chassis.pid_tuner_enabled()) {
+        // If we're on the first blank page...
+        if (ez::as::page_blank_is_on(0)) {
+          // Display X, Y, and Theta
+          ez::screen_print("x: " + util::to_string_with_precision(chassis.odom_x_get()) +
+                               "\ny: " + util::to_string_with_precision(chassis.odom_y_get()) +
+                               "\na: " + util::to_string_with_precision(chassis.odom_theta_get()),
+                           1);  // Don't override the top Page line
+
+          // Display all trackers that are being used
+          screen_print_tracker(chassis.odom_tracker_left, "l", 4);
+          screen_print_tracker(chassis.odom_tracker_right, "r", 5);
+          screen_print_tracker(chassis.odom_tracker_back, "b", 6);
+          screen_print_tracker(chassis.odom_tracker_front, "f", 7);
+        }
+      }
+    }
+
+    // Remove all blank pages when connected to a comp switch
+    else {
+      if (ez::as::page_blank_amount() > 0)
+        ez::as::page_blank_remove_all();
+    }
+
+    pros::delay(ez::util::DELAY_TIME);
+  }
+}
+pros::Task ezScreenTask(ez_screen_task);
+
+/**
+ * Gives you some extras to run in your opcontrol:
+ * - run your autonomous routine in opcontrol by pressing DOWN and B
+ *   - to prevent this from accidentally happening at a competition, this
+ *     is only enabled when you're not connected to competition control.
+ * - gives you a GUI to change your PID values live by pressing X
+ */
+void ez_template_extras() {
+  // Only run this when not connected to a competition switch
+  if (!pros::competition::is_connected()) {
+    // PID Tuner
+    // - after you find values that you're happy with, you'll have to set them in auton.cpp
+
+    // Enable / Disable PID Tuner
+    //  When enabled:
+    //  * use A and Y to increment / decrement the constants
+    //  * use the arrow keys to navigate the constants
+    if (master.get_digital_new_press(DIGITAL_X))
+      chassis.pid_tuner_toggle();
+
+    // Trigger the selected autonomous routine
+    if (master.get_digital(DIGITAL_B) && master.get_digital(DIGITAL_DOWN)) {
+      pros::motor_brake_mode_e_t preference = chassis.drive_brake_get();
+      autonomous();
+      chassis.drive_brake_set(preference);
+    }
+
+    // Allow PID Tuner to iterate
+    chassis.pid_tuner_iterate();
+  }
+
+  // Disable PID Tuner when connected to a comp switch
+  else {
+    if (chassis.pid_tuner_enabled())
+      chassis.pid_tuner_disable();
+  }
+}
+
+/*
  * Runs the operator control code. This function will be started in its own task
  * with the default priority and stack size whenever the robot is enabled via
  * the Field Management System or the VEX Competition Switch in the operator
  * control mode.
- *
- * If no competition control is connected, this function will run immediately
- * following initialize().
- *
- * If the robot is disabled or communications is lost, the
- * operator control task will be stopped. Re-enabling the robot will restart the
- * task, not resume it from where it left off.
  */
-void opcontrol() {
-	 bool enableDoinker = false;
-   auto_started = false;
-   //int ladyBrownToggle =1; 
-	while (true) {
-     int leftY = master.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
-     int rightX = master.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X);
-     chassis.curvature(leftY, rightX);
 
-	 if(master.get_digital(pros::E_CONTROLLER_DIGITAL_R1)) {
-    if(currState == 1) {
-      if (hookIntake.get_efficiency() > 50 && hookIntake.get_actual_velocity() > 50) {
-        intakeMove(127);
-      } else {
-        hookIntake.brake();
-        floatingIntake.move(127);
-      }
-    } else {
-      intakeMove(127);
-    }
-	 } else if (master.get_digital(pros::E_CONTROLLER_DIGITAL_R2)) {
-    if(currState == 1) {
-      if (hookIntake.get_efficiency() > 50 && hookIntake.get_actual_velocity() > -50) {
-        intakeMove(-127);
-      } else {
-        hookIntake.brake();
-        floatingIntake.move(-127);
-      }
-    } else {
-      intakeMove(-127);
-    }
-	 } else {
+void opcontrol() {
+  // This is preference to what you like to drive on
+  chassis.drive_brake_set(MOTOR_BRAKE_HOLD);  // Set motors to hold.
+  while (true) {
+    // Gives you some extras to make EZ-Template ezier
+    ez_template_extras();
+
+    chassis.opcontrol_arcade_standard(ez::SPLIT);  // spilt arcade drive
+    
+    // sets up controls for intake
+  if(master.get_digital(pros::E_CONTROLLER_DIGITAL_R1)) { // moves both intake motors forwrard
+    intakeMove(127);
+	 } else if (master.get_digital(pros::E_CONTROLLER_DIGITAL_R2)) { // moves floating intake motor backwards and brakes the hook intake motor
+    hookIntake.brake();
+    floatingIntake.move(-127);
+	 } else { // brakes both motors
 		  intakeBrake();
 	 } 
-
-   // sets up three toggles for the Lady Brown mech, first is intaking position then to scoring position, lastly to rest
-    /*if (master.get_digital_new_press(DIGITAL_L1)) {
-      ladyBrownToggle++;
-    } else if (master.get_digital(DIGITAL_L2)) {
-      ladyBrownToggle =1;
-    } else if (ladyBrownToggle >3) {
-      ladyBrownToggle =0;
-    } else if (master.get_digital(DIGITAL_DOWN)) {
-      ladyBrownToggle = 1;
-    } 
-
-   if(ladyBrownToggle ==0) {
-    ladyBrown.move_relative(-50,200);
-   } else if (ladyBrownToggle ==1) {
-    ladyBrownPD(0);
-   } else if (ladyBrownToggle ==2) {
-    ladyBrownPD(250);
-   } else if (ladyBrownToggle ==3) {
-    ladyBrownPD(500);
-   } */
-   if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_L1)) {
-    nextState();
-   } else if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_L2)) {
-    currState = 0;
-   } else if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_DOWN)) {
-    currState = 2;
-   }
    
-     // sets up controllers for Mogo Mech, uses one toggle for enable and disable
-	 if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_RIGHT)) {
-		enableMogoMech = !enableMogoMech;
-	 }
-	 if (enableMogoMech) {
-		mogoMech.set_value(true);
-	 } else {
-		mogoMech.set_value(false);
-	 }
+  // sets up controls for ladyBrown
+  if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_L1)) { // toggle for next state, used for scoring on Wall Stakes
+   nextState(); // Move ladyBrown to the next state
+  } else if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_L2)) { // sets ladyBrown to rest position
+   restPosition(); // Move ladyBrown to the rest position
+  } else if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_DOWN)) { // toggles ladyBrown allianceState, scores on alliance stake
+   allianceState++; // Increment allianceState to score on alliance stake
+  } else if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_B)) { // sets ladyBrown to tilt and untilt a Mobile Goal
+   mogoUnTilt(); // Tilt or untilt a Mobile Goal
+  }
 
-     // sets up controllers for Doinker, uses one toggle for enable and disable
-   if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_Y)) {
+
+  // sets up controls for allianceState, used for scoring on alliance stakes
+  if (allianceState == 1) { // If allianceState is 1, set ladyBrown to directly above alliance stake
+    currState = 3; // Set current state to 3
+    target = states[currState]; // Set target to the state corresponding to currState
+  } else if (allianceState == 2) { // If allianceState is 2, score on alliance stake
+    currState = 4; // Set current state to 4
+    target = states[currState]; // Set target to the state corresponding to currState
+    pros::delay(10); // Delay for 10 milliseconds
+    allianceState = 0; // Reset allianceState to 0
+  }
+
+
+  // sets up controllers for Mogo Mech, uses one toggle for enable and disable
+  if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_RIGHT)) { // Toggle Mogo Mech on RIGHT button press
+    enableMogoMech = !enableMogoMech;
+  }
+  if (enableMogoMech) {
+    mogoMech.set_value(true); // Enable the Mogo Mech
+  } else {
+    mogoMech.set_value(false); // Disable the Mogo Mech
+  }
+
+
+  // sets up controllers for Doinker, uses one toggle for enable and disable
+  if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_Y)) { // Toggle Doinker on Y button press
     enableDoinker = !enableDoinker;
-   }
-   if(enableDoinker) {
-    doinker.set_value(true);
-   } else {
+  }
+  if(enableDoinker) {
+    doinker.set_value(true); // Enable the doinker
+  } else {
+  // Disable the doinker
     doinker.set_value(false);
-   }
+  }
 
-     pros::delay(10);
-	}
+
+  // Set hookIntake brake mode based on ladyBrown's current state
+  if (currState == 1) { // When ladyBrown is at loading position, set hookIntake to brake mode hold
+    hookIntake.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD);
+  } else { // When ladyBrown is in any other position, set hookIntake to brake mode coast
+    hookIntake.set_brake_mode(pros::E_MOTOR_BRAKE_COAST);
+  }
+
+    pros::delay(ez::util::DELAY_TIME);  // Delay to prevent the CPU from getting overwhelmed
+  }
 }
