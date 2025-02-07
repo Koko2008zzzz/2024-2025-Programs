@@ -17,7 +17,8 @@ const int SWING_SPEED = 110;
 ///
 void default_constants() {
   // P, I, D, and Start I
-  chassis.pid_drive_constants_set(20.0, 0.0, 100.0);         // Fwd/rev constants, used for odom and non odom motions
+  chassis.pid_drive_constants_forward_set(20.0, 0.0, 100.0);
+  chassis.pid_drive_constants_backward_set(20.0, 0.0, 100.0);// Fwd/rev constants, used for odom and non odom motions
   chassis.pid_heading_constants_set(11.0, 0.0, 20.0);        // Holds the robot straight while going forward without odom
   chassis.pid_turn_constants_set(3.0, 0.05, 20.0, 15.0);     // Turn in place constants
   chassis.pid_swing_constants_set(6.0, 0.0, 65.0);           // Swing constants
@@ -36,7 +37,8 @@ void default_constants() {
 
   // Slew constants
   chassis.slew_turn_constants_set(3_deg, 70);
-  chassis.slew_drive_constants_set(3_in, 70);
+  chassis.slew_drive_constants_forward_set(7_in, 40);
+  chassis.slew_drive_constants_backward_set(3_in, 70);
   chassis.slew_swing_constants_set(3_in, 80);
 
   // The amount that turns are prioritized over driving in odom motions
@@ -50,12 +52,20 @@ void default_constants() {
   chassis.pid_angle_behavior_set(ez::shortest);  // Changes the default behavior for turning, this defaults it to the shortest path there
 }
 
-// Function to wait for the chassis to complete its current motion
+void mogoGrabbed() {
+  chassis.pid_drive_constants_forward_set(20.0, 0.0, 100.0);
+  chassis.pid_drive_constants_backward_set(20.0, 0.0, 100.0);
+  chassis.pid_odom_angular_constants_set(6.5, 0.0, 52.5);    // Angular control for odom motions
+  chassis.pid_odom_boomerang_constants_set(5.8, 0.0, 32.5);  // Angular control for boomerang motions
+  chassis.slew_drive_constants_forward_set(7_in, 80);
+  chassis.slew_drive_constants_backward_set(3_in, 70);
+}
+
+
+enum class dir { fwd, rev };
 void wait() {
   chassis.pid_wait();
 }
-
-enum class dir { fwd, rev };
 
 //sets up function for motion chaining, used for chaining multiple motions together, can call function instead of writing everything out
 void multPoints(std::tuple<double, double, double, int> point1, std::tuple<double, double, double, int> point2, dir direction) {
@@ -79,7 +89,7 @@ void moveToPoint(double X, double Y, int speed, dir dir = dir::fwd) {
 
 //sets up function for driving relative to the robot, used for driving a specific distance relative to the robot
 void drive(double distance, double speed) {
-  chassis.pid_odom_set(distance * 1_in,speed, true);
+  chassis.pid_odom_set(distance * 1_in, speed, true);
 }
 
 //sets up function for turning to a specific heading, used for turning to a specific angle
@@ -92,73 +102,57 @@ void skillsAuton() {
   currState = 0;
   target = states[currState];
   hookIntake.move(127);
-  pros::delay(500);
+  pros::delay(250);
   hookIntake.brake();
   //////////////////////////////
   //moves to the first mogo
-  moveToPoint(0,11,90);
+  moveToPoint(0,12,90);
   wait();
-  moveToPoint(29,11,60,dir::rev);
-  pros::delay(1173);
+  turnToHeading(-90,90);
+  wait();
+  moveToPoint(29,12,60,dir::rev);
+  pros::delay(1000);
   mogoMech.set_value(true);
-  pros::delay(200);
+  pros::delay(150);
   //////////////////////////////
   //moves to score 2 rings
-  moveToPoint(25,38,DRIVE_SPEED);
+  moveToPoint(22,38,110);
   intakeMove(127);
   wait();
-  moveToPoint(56.5,37,110);
+  moveToPoint(56,38,110);
   wait();
   moveToPoint(41,37,110,dir::rev);
   wait();
   //////////////////////////////
   //moves to intake Ring and score on Wall Stake
-  moveToPoint(41,59.4,100);
-  hookIntake.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD);
-  currState = 1;
-  target = states[currState];
+  moveToPoint(56.5,63,90);
   wait();
-  turnToHeading(90,TURN_SPEED);
-  wait();
-  moveToPoint(57.45,59.8,70);
-  wait();
-  pros::delay(1500);
-  intakeBrake();
-  hookIntake.set_brake_mode(pros::E_MOTOR_BRAKE_COAST);
-  currState =2;
-  target = states[currState];
-  pros::delay(1100);
-  currState = 0;
-  target = states[currState];
   //////////////////////////////
   //moves to score 2 more rings on Mogo 
-  intakeMove(127);
-  moveToPoint(46.75,59.4,110,dir::rev);
+  moveToPoint(46.75,61.5,110,dir::rev);
   wait();
-  moveToPoint(46.75,-3,75);
+  moveToPoint(46.75,-1,75);
   wait();
-  pros::delay(200);
   //////////////////////////////
   //moves to 5th ring on Mogo
-  moveToPoint(30,7,80,dir::rev);
+  moveToPoint(30,9,80,dir::rev);
   wait();
-  moveToPoint(59,7,110);
+  moveToPoint(59,9,110);
   wait();
   //////////////////////////////
   //puts mogo in corner
-  moveToPoint(55,7,110,dir::rev);
+  moveToPoint(55,9,110,dir::rev);
   wait();
-  moveToPoint(60,-3,110,dir::rev);
+  moveToPoint(62,0,110,dir::rev);
   wait();
   intakeBrake();
-  pros::delay(200);
   mogoMech.set_value(false);
-  pros::delay(200);
+  pros::delay(150);
   //////////////////////////////
   //move to second mogo
-  moveToPoint(48,5.35,110);
+  moveToPoint(48,5.5,110);
   wait();
-  multPoints({-5,5.35,90,110},{-22,5.35,90,65},dir::rev);
+  multPoints({0,5.7,90,110},{-22,5.7,90,70},dir::rev);
   wait();
   mogoMech.set_value(true);
   pros::delay(150);
@@ -175,45 +169,27 @@ void skillsAuton() {
   //moves to intake and score on Wall Stake
   moveToPoint(-42.5,32,110,dir::rev);
   wait();
-  moveToPoint(-42.5,54.6,110);
-  hookIntake.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD);
-  currState = 1;
-  target = states[currState];
+  moveToPoint(-55,63,110);
   wait();
-  turnToHeading(-90,TURN_SPEED);
-  wait();
-  drive(17.5,70);
-  wait();
-  pros::delay(1500);
-  intakeBrake();
-  hookIntake.set_brake_mode(pros::E_MOTOR_BRAKE_COAST);
-  currState =2;
-  target = states[currState];
-  pros::delay(1100);
-  currState = 0;
-  target = states[currState];
   //////////////////////////////
   //moves to score 2 more rings on Mogo
-  intakeMove(127);
-  moveToPoint(-49.5,54.6,110,dir::rev);
+  moveToPoint(-47.75,54.6,110,dir::rev);
   wait();
-  moveToPoint(-49.5,-3.25,75);
+  moveToPoint(-47.75,-3.25,110);
   wait();
-  pros::delay(300);
   //////////////////////////////
   //moves to 5th ring on Mogo
-  moveToPoint(-30,7,80,dir::rev);
+  moveToPoint(-30,7.125,110,dir::rev);
   wait();
-  moveToPoint(-60.25,7,110);
+  moveToPoint(-58.75,7.125,110);
   wait();
   //////////////////////////////
   //puts mogo in corner
   moveToPoint(-55,7,110,dir::rev);
   wait();
-  moveToPoint(-60,-3,110,dir::rev);
+  moveToPoint(-60,-2,110,dir::rev);
   wait();
   intakeBrake();
-  pros::delay(200);
   mogoMech.set_value(false);
   pros::delay(200);
   moveToPoint(-46,15,110);
@@ -234,8 +210,8 @@ void skillsAuton() {
   wait();
   //////////////////////////////
   //moves to center mogo
-  moveToPoint(8, 115, 65, dir::rev);
-  pros::delay(2000); //tune this value
+  moveToPoint(16, 123, 65, dir::rev);
+  pros::delay(2075); //tune this value
   mogoMech.set_value(true);
   pros::delay(200);
   //////////////////////////////
@@ -243,28 +219,27 @@ void skillsAuton() {
   intakeMove(127);
   moveToPoint(25, 82, 110);
   wait();
-  turnToHeading(180,90);
-  wait();
-  drive(3,110);
-  wait();
-  moveToPoint(57, 79, 110);
+  moveToPoint(57, 77, 110);
   wait();
   //////////////////////////////
   //moves to score 1 more ring
-  moveToPoint(57, 110, 110);
+  moveToPoint(61, 110, 110);
   wait();
   moveToPoint(49, 122, 110);
   wait();
   //////////////////////////////
   //puts mogo in corner
   moveToPoint(58, 123, 110, dir::rev);
+  pros::delay(250);
+  mogoMech.set_value(false);
   intakeBrake();
   wait();
-  mogoMech.set_value(false);
-  pros::delay(200);
   //////////////////////////////
   //moves to last mogo
-  multPoints({24, 106, -100, 110}, {0, 94, -100, 65}, dir::fwd);
+  multPoints({24, 106, -100, 110}, {-48, 133, -100, 90}, dir::fwd);
+  intakeMove(127);
+  wait();
+  moveToPoint(-36, 100, 110, dir::rev);
   wait();
 }
 
@@ -326,6 +301,75 @@ void rightSoloAWP () {
   target = states[currState];
   wait();
   //////////////////////////////
+}
+
+void soloAWPState() {
+   //scores on Alliance Stake with Lady Brown
+  chassis.odom_xyt_set(0_in, 0_in, 180_deg);
+  hookIntake.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD);
+  currState =1;
+  target = states[currState];
+  pros::delay(260);
+  hookIntake.move(127);
+  pros::delay(500);
+  hookIntake.brake();
+  pros::delay(10);
+  turnToHeading(-139,90);
+  wait();
+  drive(3.75,110);
+  wait();
+  hookIntake.set_brake_mode(pros::E_MOTOR_BRAKE_COAST);
+  currState =4;
+  target = states[currState];
+  pros::delay(650);
+  //////////////////////////////
+  //moves to mogo
+  drive(-10,110);
+  pros::delay(100);
+  currState =0;
+  target = states[currState];
+  wait();
+  moveToPoint(15, 37, 65, dir::rev);
+  pros::delay(1150);
+  mogoMech.set_value(true);
+  intakeMove(127);
+  pros::delay(150);
+  //////////////////////////////
+  //moves to score a Ring
+  moveToPoint(33,28,110); //37.5 og value
+  wait();
+  //////////////////////////////
+  //moves to center Ring, uses Doinker to  pull off Ring
+  moveToPoint(0,7,110);
+  wait();
+  turnToHeading(-90,90);
+  wait();
+  drive(30,90);
+  mogoMech.set_value(false);
+  wait();
+  hookIntake.brake();
+  floatingIntake.move(127);
+  drive(20,90);
+  wait();
+  turnToHeading(-150,90);
+  wait();
+  drive(-30,70);
+  pros::delay(800);
+  mogoMech.set_value(true);
+  pros::delay(100);
+  turnToHeading(-110,90);
+  wait();
+  drive(30,110);
+  intakeMove(127);
+  enableMogoMech = true;
+  wait();
+  turnToHeading(90,90);
+  wait();
+  drive(35.5,110);
+  currState =2;
+  target = states[currState];
+  wait();
+  intakeBrake();
 }
 
 void rightAutonElim ()  {

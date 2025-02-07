@@ -22,6 +22,55 @@ ez::Drive chassis(
 // - `4.0` is the distance from the center of the wheel to the center of the robot
 // ez::tracking_wheel horiz_tracker(8, 2.75, 4.0);  // This tracking wheel is perpendicular to the drive wheels
 // ez::tracking_wheel vert_tracker(9, 2.75, 4.0);   // This tracking wheel is parallel to the drive wheels
+bool ringDetected = false;
+bool distanceRight = false;
+double motorPosition = 0;
+void colorSort () {
+  double color = colorSorter.get_hue();
+  double distance = intakeDistance.get();
+    if(alliance ==0) {
+      if (master.get_digital(pros::E_CONTROLLER_DIGITAL_R1)) {
+        if(color > 120 && color < 250) {
+          ringDetected = true;
+          if (currState ==1) {
+            currState = 0;
+            target = states[currState];
+          }
+          if (ringDetected) {
+            if (distance < 75 && distance > 0) {
+              distanceRight = true;
+              if(distanceRight) {
+                pros::delay(66.7);//61
+                hookIntake.brake();
+                //hookIntake.move(-127);
+                pros::delay(40); //no work: 200, 225, 250, work: 230, kinda:100
+                hookIntake.move(-127);
+                //hookIntake.brake();//65
+                pros::delay(200);// 100
+                //hookIntake.move(45);//55
+                pros::delay(125);//50
+                ringDetected = false;
+                distanceRight = false;
+              }
+            }
+          }
+        } else {
+          intakeMove(127);
+          ringDetected = false;
+          distanceRight = false;
+        }
+      } else if (master.get_digital(pros::E_CONTROLLER_DIGITAL_R2)) {
+        hookIntake.brake();
+        floatingIntake.move(-127);
+        ringDetected = false;
+        distanceRight = false;
+      } else {
+        intakeBrake();
+        ringDetected = false;
+        distanceRight = false;
+      }
+    } 
+}
 
 
 /**
@@ -43,6 +92,8 @@ void initialize() {
   //sets rotation  sensor to zero  position and sets it reversed
   ladyBrownRotation.reset_position();
   ladyBrownRotation.set_reversed(true);
+  colorSorter.set_led_pwm(100);
+
 
   // Configure your chassis controls
   chassis.opcontrol_curve_buttons_toggle(true);   // Enables modifying the controller curve with buttons on the joysticks
@@ -54,7 +105,7 @@ void initialize() {
 
   // Autonomous Selector using LLEMU
   ez::as::auton_selector.autons_add({
-      {"Skills\n\nSkills Auton", rightAutonElim},
+      {"Skills\n\nSkills Auton", skillsAuton},
       {"Right Solo AWP\n\nRight side any alliance solo AWP", rightSoloAWP},
       {"Left Solo AWP\n\nLeft side any alliance solo AWP", leftSoloAWP},
       {"Ring Rush\n\nRed Solo AWP", ringRushLeft_soloAWP},
@@ -70,13 +121,20 @@ void initialize() {
   ez::as::initialize();
   master.rumble(chassis.drive_imu_calibrated() ? "." : "---");
 
+ /* pros::Task colorSortTask([]{
+    while (1){
+    colorSort();
+    pros::delay(10);
+    }
+  });*/
   // Starts Lady Brown PD Loop Control
   pros::Task liftControlTask([]{
     while (true) {
       liftControl();
       pros::delay(10);
     }
-  }); 
+  });
+  
 }
 
 /**
@@ -218,6 +276,7 @@ void ez_template_extras() {
 void opcontrol() {
   // This is preference to what you like to drive on
   chassis.drive_brake_set(MOTOR_BRAKE_HOLD);  // Set motors to hold.
+  
   while (true) {
     // Gives you some extras to make EZ-Template ezier
     ez_template_extras();
@@ -274,10 +333,10 @@ void opcontrol() {
     enableDoinker = !enableDoinker;
   }
   if(enableDoinker) {
-    doinker.set_value(true); // Enable the doinker
+    rightDoinker.set_value(true); // Enable the doinker
   } else {
   // Disable the doinker
-    doinker.set_value(false);
+    rightDoinker.set_value(false);
   }
 
 
@@ -286,6 +345,23 @@ void opcontrol() {
     hookIntake.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD);
   } else { // When ladyBrown is in any other position, set hookIntake to brake mode coast
     hookIntake.set_brake_mode(pros::E_MOTOR_BRAKE_COAST);
+  }
+
+  if (currState ==2) { // If ladyBrown is in a scoring position, set kP and kD to XXX and XXX respectively
+    kP = 0.25;
+    kD = 0.2;
+  } else if (currState ==3) { // If ladyBrown is in a Alliance Stake position, set kP and kD to XXX and XXX respectively
+    kP = 0.15;
+    kD = 0.1;
+  } else if (currState ==4) { // If ladyBrown is in a Alliance Stake Scoring position, set kP and kD to XXX and XXX respectively
+    kP = 0.15;
+    kD = 0.1;
+  } else if (currState ==5) { // If ladyBrown is in a Mobile Goal position, set kP and kD to XXX and XXX respectively
+    kP = 0.3;
+    kD = 0.11;
+  } else {
+    kP = 0.15;
+    kD = 0.01;
   }
 
     pros::delay(ez::util::DELAY_TIME);  // Delay to prevent the CPU from getting overwhelmed

@@ -6,6 +6,7 @@ void default_constants();
 void skillsAuton();
 void rightSoloAWP();
 void leftSoloAWP ();
+void soloAWPState();
 void rightAutonElim();
 void ringRushLeft_soloAWP();
 void ringRushRight_soloAWP();
