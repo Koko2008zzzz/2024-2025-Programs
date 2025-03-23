@@ -8,11 +8,11 @@
 // Chassis constructor
 ez::Drive chassis(
     // These are your drive motors, the first motor is used for sensing!
-    {11, -12, -13},     // Left Chassis Ports (negative port will reverse it!)
-    {-19, 18, 17},  // Right Chassis Ports (negative port will reverse it!)
+    {19, -18, -20},     // Left Chassis Ports (negative port will reverse it!)
+    {-1, 2, 3},  // Right Chassis Ports (negative port will reverse it!)
 
-    9,      // IMU Port
-    2.75,  // Wheel Diameter (Remember, 4" wheels without screw holes are actually 4.125!)
+    12,      // IMU Port
+    3.25,  // Wheel Diameter (Remember, 4" wheels without screw holes are actually 4.125!)
     450);   // Wheel RPM = cartridge * (motor gear / wheel gear)
 
 // Uncomment the trackers you're using here!
@@ -20,57 +20,31 @@ ez::Drive chassis(
 //  - you should get positive values on the encoders going FORWARD and RIGHT
 // - `2.75` is the wheel diameter
 // - `4.0` is the distance from the center of the wheel to the center of the robot
-// ez::tracking_wheel horiz_tracker(8, 2.75, 4.0);  // This tracking wheel is perpendicular to the drive wheels
+ ez::tracking_wheel horiz_tracker(-10, 2, -1.75);  // This tracking wheel is perpendicular to the drive wheels
 // ez::tracking_wheel vert_tracker(9, 2.75, 4.0);   // This tracking wheel is parallel to the drive wheels
-bool ringDetected = false;
-bool distanceRight = false;
-double motorPosition = 0;
+
 void colorSort () {
-  double color = colorSorter.get_hue();
-  double distance = intakeDistance.get();
-    if(alliance ==0) {
-      if (master.get_digital(pros::E_CONTROLLER_DIGITAL_R1)) {
-        if(color > 120 && color < 250) {
-          ringDetected = true;
-          if (currState ==1) {
-            currState = 0;
-            target = states[currState];
-          }
-          if (ringDetected) {
-            if (distance < 75 && distance > 0) {
-              distanceRight = true;
-              if(distanceRight) {
-                pros::delay(66.7);//61
-                hookIntake.brake();
-                //hookIntake.move(-127);
-                pros::delay(40); //no work: 200, 225, 250, work: 230, kinda:100
-                hookIntake.move(-127);
-                //hookIntake.brake();//65
-                pros::delay(200);// 100
-                //hookIntake.move(45);//55
-                pros::delay(125);//50
-                ringDetected = false;
-                distanceRight = false;
-              }
-            }
-          }
-        } else {
-          intakeMove(127);
-          ringDetected = false;
-          distanceRight = false;
-        }
-      } else if (master.get_digital(pros::E_CONTROLLER_DIGITAL_R2)) {
-        hookIntake.brake();
-        floatingIntake.move(-127);
-        ringDetected = false;
-        distanceRight = false;
-      } else {
-        intakeBrake();
-        ringDetected = false;
-        distanceRight = false;
-      }
-    } 
+  if (alliance ==1) {
+    if(colorSorter.get_hue() > 0 && colorSorter.get_hue() <15) {
+      pros::delay(0.5);
+      intake.brake();
+      pros::delay(200);
+      intake.move(127);
+    }
+ } else if (alliance  ==2) {
+    if(colorSorter.get_hue() > 100 && colorSorter.get_hue()<250) {
+      pros::delay(1);
+      intake.brake();
+      pros::delay(200);
+      intake.move(127);
+    }
+ } else if (alliance == 0) {
+  //nothing
+ }
 }
+
+
+
 
 
 /**
@@ -91,13 +65,12 @@ void initialize() {
 
   //sets rotation  sensor to zero  position and sets it reversed
   ladyBrownRotation.reset_position();
-  ladyBrownRotation.set_reversed(true);
   colorSorter.set_led_pwm(100);
 
 
   // Configure your chassis controls
   chassis.opcontrol_curve_buttons_toggle(true);   // Enables modifying the controller curve with buttons on the joysticks
-  chassis.opcontrol_drive_activebrake_set(0.0);   // Sets the active brake kP. We recommend ~2.  0 will disable.
+  chassis.opcontrol_drive_activebrake_set(0.0);//was 0.0   // Sets the active brake kP. We recommend ~2.  0 will disable.
   chassis.opcontrol_curve_default_set(0.0, 0.0);  // Defaults for curve. If using tank, only the first parameter is used. (Comment this line out if you have an SD card!)
 
   // Set the drive to your own constants from autons.cpp!
@@ -106,14 +79,9 @@ void initialize() {
   // Autonomous Selector using LLEMU
   ez::as::auton_selector.autons_add({
       {"Skills\n\nSkills Auton", skillsAuton},
-      {"Right Solo AWP\n\nRight side any alliance solo AWP", rightSoloAWP},
-      {"Left Solo AWP\n\nLeft side any alliance solo AWP", leftSoloAWP},
-      {"Ring Rush\n\nRed Solo AWP", ringRushLeft_soloAWP},
-      {"Ring Rush\n\nBlue Solo AWP", ringRushRight_soloAWP},
-      {"Ring Rush\n\nRed Elim Auton",ringRushLeft_ElimAuton},
-      {"Ring Rush\n\nBlue Elim Auton",ringRushRight_ElimAuton},
-      {"Right Goal Rush\n\nRight Goal Rush", rightGoalRush_soloAWP},
-      {"Left Goal Rush\n\nLeft Goal Rush", leftGoalRush_soloAWP},
+      {"State Solo AWP", soloAWPState},
+      {"right side five on mogo\n\nRIght side", rightAutonSixRing},
+      {"Ring Rush\n\nRed Solo AWP", ringRushRight_fourRingMogo},
   });
 
   // Initialize chassis and auton selector
@@ -121,12 +89,12 @@ void initialize() {
   ez::as::initialize();
   master.rumble(chassis.drive_imu_calibrated() ? "." : "---");
 
- /* pros::Task colorSortTask([]{
+pros::Task colorSortTask([]{
     while (1){
     colorSort();
     pros::delay(10);
     }
-  });*/
+  }); 
   // Starts Lady Brown PD Loop Control
   pros::Task liftControlTask([]{
     while (true) {
@@ -134,7 +102,12 @@ void initialize() {
       pros::delay(10);
     }
   });
-  
+  pros::Task antiJamTask([]{
+    while (true) {
+      antiJamCode();
+      pros::delay(10);
+    }
+  });
 }
 
 /**
@@ -156,7 +129,12 @@ void disabled() {
  * starts.
  */
 void competition_initialize() {
-  // . . .
+  while (true) {
+    if (bumper.get_value() == 1) {
+      ez::as::page_up();
+      pros::delay(300);
+    } 
+  }
 }
 
 void autonomous() {
@@ -276,22 +254,21 @@ void ez_template_extras() {
 void opcontrol() {
   // This is preference to what you like to drive on
   chassis.drive_brake_set(MOTOR_BRAKE_HOLD);  // Set motors to hold.
-  
+
   while (true) {
+    //colorSort1();
     // Gives you some extras to make EZ-Template ezier
     ez_template_extras();
-
     chassis.opcontrol_arcade_standard(ez::SPLIT);  // spilt arcade drive
     
     // sets up controls for intake
   if(master.get_digital(pros::E_CONTROLLER_DIGITAL_R1)) { // moves both intake motors forwrard
     intakeMove(127);
 	 } else if (master.get_digital(pros::E_CONTROLLER_DIGITAL_R2)) { // moves floating intake motor backwards and brakes the hook intake motor
-    hookIntake.brake();
-    floatingIntake.move(-127);
+    intakeMove(-127);
 	 } else { // brakes both motors
-		  intakeBrake();
-	 } 
+    intakeMove(0);
+	 }
    
   // sets up controls for ladyBrown
   if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_L1)) { // toggle for next state, used for scoring on Wall Stakes
@@ -307,16 +284,16 @@ void opcontrol() {
 
   // sets up controls for allianceState, used for scoring on alliance stakes
   if (allianceState == 1) { // If allianceState is 1, set ladyBrown to directly above alliance stake
-    currState = 3; // Set current state to 3
+    currState = 4; // Set current state to 3
     target = states[currState]; // Set target to the state corresponding to currState
   } else if (allianceState == 2) { // If allianceState is 2, score on alliance stake
-    currState = 4; // Set current state to 4
+    currState = 5; // Set current state to 4
     target = states[currState]; // Set target to the state corresponding to currState
     pros::delay(10); // Delay for 10 milliseconds
     allianceState = 0; // Reset allianceState to 0
   }
 
-
+  
   // sets up controllers for Mogo Mech, uses one toggle for enable and disable
   if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_RIGHT)) { // Toggle Mogo Mech on RIGHT button press
     enableMogoMech = !enableMogoMech;
@@ -327,43 +304,85 @@ void opcontrol() {
     mogoMech.set_value(false); // Disable the Mogo Mech
   }
 
+  if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_A)) { // Toggle Mogo Mech on LEFT button press
+    enableLeftDoinker = !enableLeftDoinker;
+  }
+
+  if (enableLeftDoinker) {
+    leftDoinker.set_value(true); // Enable the Doinker
+  } else {
+    leftDoinker.set_value(false); // Disable the Doinker
+  }
+
 
   // sets up controllers for Doinker, uses one toggle for enable and disable
   if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_Y)) { // Toggle Doinker on Y button press
-    enableDoinker = !enableDoinker;
+    enableRightDoinker = !enableRightDoinker;
   }
-  if(enableDoinker) {
+  if(enableRightDoinker) {
     rightDoinker.set_value(true); // Enable the doinker
   } else {
   // Disable the doinker
     rightDoinker.set_value(false);
   }
 
-
-  // Set hookIntake brake mode based on ladyBrown's current state
-  if (currState == 1) { // When ladyBrown is at loading position, set hookIntake to brake mode hold
-    hookIntake.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD);
-  } else { // When ladyBrown is in any other position, set hookIntake to brake mode coast
-    hookIntake.set_brake_mode(pros::E_MOTOR_BRAKE_COAST);
+  if(master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_LEFT)) { // Toggle Intake Piston on X button press
+    enableIntakePiston = !enableIntakePiston;
   }
 
-  if (currState ==2) { // If ladyBrown is in a scoring position, set kP and kD to XXX and XXX respectively
-    kP = 0.25;
-    kD = 0.2;
-  } else if (currState ==3) { // If ladyBrown is in a Alliance Stake position, set kP and kD to XXX and XXX respectively
-    kP = 0.15;
-    kD = 0.1;
-  } else if (currState ==4) { // If ladyBrown is in a Alliance Stake Scoring position, set kP and kD to XXX and XXX respectively
-    kP = 0.15;
-    kD = 0.1;
-  } else if (currState ==5) { // If ladyBrown is in a Mobile Goal position, set kP and kD to XXX and XXX respectively
-    kP = 0.3;
-    kD = 0.11;
+  if(enableIntakePiston) {
+    intakeLift.set_value(true); // Enable the Intake Piston
   } else {
-    kP = 0.15;
-    kD = 0.01;
+    intakeLift.set_value(false); // Disable the Intake Piston
   }
 
-    pros::delay(ez::util::DELAY_TIME);  // Delay to prevent the CPU from getting overwhelmed
+  if (currState == 1) {
+    kP = 0.2;
+    kD = 0.0;
+  } else if (currState == 2) {
+    kP = 0.25;
+    kD = 0.05;
+  } else if (currState == 3) {
+    kP = 0.25;
+    kD = 0.05;
+  } else if (currState == 4) {
+    kP = 0.25;
+    kD = 0.05;
+  } else if (currState == 5) {
+    kP = 0.25;
+    kD = 0.05;
+  } else if (currState == 6) {
+    kP = 0.25;
+    kD = 0.05;
+  } else {
+    kP = 0.2;
+    kD = 0.0;
+  } 
+
+   /*if (currState == 1) {
+    kP = 6;
+    kD = 0.0;
+  } else if (currState == 2) {
+    kP = 15;
+    kD = 0.0;
+  } else if (currState == 3) {
+    kP = 8;
+    kD = 0.0;
+  } else if (currState == 4) {
+    kP = 6;
+    kD = 0.0;
+  } else if (currState == 5) {
+    kP = 8;
+    kD = 0.0;
+  } else if (currState == 6) {
+    kP = 3.5;
+    kD = 0.0;
+  } else {
+    kP = 6;
+    kD = 0.0;
+  } */
+
+
+   pros::delay(ez::util::DELAY_TIME);  // Delay to prevent the CPU from getting overwhelmed
   }
 }

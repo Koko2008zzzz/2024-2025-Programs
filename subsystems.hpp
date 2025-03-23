@@ -6,39 +6,50 @@
 extern Drive chassis;
 
 //Motor for subsystems
-inline pros::Motor hookIntake(2,pros::MotorGear::blue);
-inline pros::Motor floatingIntake(-20,pros::MotorGear::blue);
-inline pros::Motor ladyBrown(-10,pros::MotorGear::green);
+inline pros::Motor intake(5,pros::MotorGear::blue);
+inline pros::Motor ladyBrown(-11,pros::MotorGear::red);
 
 //sensors
-inline pros::Rotation ladyBrownRotation(3);
-inline pros::Optical colorSorter(4);
-inline pros::Rotation intakeRotation(15);
-inline pros::Distance intakeDistance(5);
+inline pros::Rotation ladyBrownRotation(15);
+inline pros::Optical colorSorter(6);
 
-//Pneumatics
-inline pros::adi::DigitalOut mogoMech('b', false);
-inline pros::adi::DigitalOut doinker('g', false);
-inline pros::adi::DigitalOut ringRush('a', false);
-inline pros::adi::DigitalOut rightDoinker('h', false);
+//Pneumatics & 3 wire ports
+inline pros::adi::DigitalOut mogoMech('h', false);
+inline pros::adi::DigitalOut leftDoinker('g', false);
+inline pros::adi::DigitalOut intakeLift('f', false);
+inline pros::adi::DigitalOut rightDoinker('d', false);
+inline pros::adi::DigitalIn bumper('b');
 
 //variables for sensors
 inline int alliance = 0; // 0 for red, 1 for blue
 
+//variables for antiJamCode
+inline int targetInput =0;
+inline bool isJammed = false;
+inline bool ringDetected = false;
+inline const int waitTime = 30;
+inline const int outtakeTime = 300;
+inline const int minSpeed = 20;
+inline int jamCounter =0;
+inline const int delayTime =10;
+
 // variables for subsystems
 inline bool enableMogoMech = false;
-inline bool enableDoinker = false;
+inline bool enableLeftDoinker = false;
+inline bool enableRightDoinker = false;
+inline bool enableIntakePiston = false;
 inline int colorSorted =0;
 inline int allianceState = 0;
                     
 //pd loop for lift
-inline const int numStates = 6; // number of total states for Lady Brown
-inline int states[numStates] = {0, 3800, 15625, 17300, 21600, 23600}; // states for Lady Brown 33, 156.25, 177, 216, 236 degrees
+inline const int numStates = 7; // number of total states for Lady Brown
+//inline int states[numStates] = {0, 180, 345, 675, 780, 1000, 1050}; // states for Lady Brown 37.5, 156.25, 170, 216, 236 degrees
+inline int states[numStates] = {0, 3900, 8800, 14500, 16000, 20700, 22600}; // states for Lady Brown 37.5, 156.25, 170, 216, 236 degrees
 inline int currState = 0; // current state for Lady Brown
 inline double target = 0; // target for Lady Brown
 inline double prevError = 0; // previous error for Lady Brown
-inline double kP =0.15; // proportional constant for Lady Brown
-inline double kD =0.01; // derivative constant for Lady Brown
+inline double kP =0.2; // proportional constant for Lady Brown, 5kp for only motor, 0.2
+inline double kD =0.00; // derivative constant for Lady Brown
 
 ///////// Lady Brown Controller
 // Function to move to the next state for Lady Brown
@@ -47,10 +58,9 @@ inline void nextState () {
   currState++;
   
   // If the current state exceeds the maximum defined states, reset to 0
-  if (currState >= 3) {
-    currState = 0;
+  if (currState >= 4) {
+    currState = 1;
   }
-  
   // Set the target position to the new state's position
   target = states[currState];
 }
@@ -63,13 +73,14 @@ inline void restPosition () {
 
 // Function to tilt and untilt the Mobile Goal
 inline void mogoUnTilt () {
-  currState = 5;
+  currState = 6;
   target = states[currState];
 }
 
 //lift control function
 inline void liftControl () {
   // Calculate the error between the target position and the current position
+  //double error = target - ladyBrown.get_position();
   double error = target - ladyBrownRotation.get_position();
   
   // Calculate the derivative of the error
@@ -85,102 +96,38 @@ inline void liftControl () {
   prevError = error;
 }
 
-//////////////////////////////
-///////// Color Sorter
-// Variable to track if a ring is detected
-/*inline bool ringDetected = false;
-
-// Function to sort rings based on color and distance
-inline void colorSort () {
-  // Get the hue value from the color sensor, checks everytime it runs
-  //double color = colorSorter.get_hue();
-  
-  // Get the distance value from the distance sensor, checks everytime it runs
-  double distance = intakeDistance.get();
-  
-  // Check if the alliance is blue
-  if (alliance == 1) {
-    // If the color is red (hue > 330 or hue < 30), set ringDetected to true
-    if (colorSorter.get_hue() > 330 || colorSorter.get_hue() < 30) {
-      ringDetected = true;
-    }
-    
-    // If a ring is detected and the distance is less than 20
-    if (ringDetected) {
-      if (distance < 20) {
-        // Move the hook intake motor to eject the ring
-        pros::delay(200);
-        hookIntake.move(-127);
-        pros::delay(50);
-        hookIntake.move(127);
-        
-        // Reset ringDetected to false
-        ringDetected = false;
-      } 
-    } 
-  } 
-  // Check if the alliance is red
-  else if (alliance == 0) {
-    // If the color is blue (hue > 150 and hue < 210), set ringDetected to true
-    if (colorSorter.get_hue() > 120 && colorSorter.get_hue() < 250) {
-      pros::delay(10);
-      hookIntake.brake();
-      pros::delay(2000);
-    }
-  }
-}*/
-    // If a ring is detected and the distance is less than 20
-    /*if (ringDetected) {
-      if (distance < 20 && distance > 5) {
-        // Move the hook intake motor to eject the ring
-        pros::delay(200);
-        hookIntake.move(-127);
-        pros::delay(50);
-        hookIntake.move(127);
-        
-        // Reset ringDetected to false
-        ringDetected = false;
-      } 
-    } 
-  }
-} 
-/*inline bool ringDetected = false;
-inline void colorSort () {
-  double color = colorSorter.get_hue();
-  if (alliance == 1) {
-    if (color > 330 || color < 30) {
-      ringDetected = true;
-    }
-    if (ringDetected) {
-      if (intakeRotation.get_position() > 20000 && intakeRotation.get_position() < 21000) {
-        hookIntake.move(-127);
-        pros::delay(50);
-        hookIntake.move(127);
-        ringDetected = false;
-      } 
-    } 
-  } else if (alliance == 0) {
-    if (color > 150 && color < 210) {
-      ringDetected = true;
-    }
-    if (ringDetected) {
-      if (intakeRotation.get_position() > 20000 && intakeRotation.get_position() < 21000) {
-        hookIntake.move(-127);
-        pros::delay(50);
-        hookIntake.move(127);
-        ringDetected = false;
-      } 
-    } 
-  }
-} */
-
-//intake control function
-inline void intakeMove(double voltage) { //moves both intake motors to a set voltage
-    hookIntake.move(voltage);
-    floatingIntake.move(voltage);
+void intakeMove (int input) {
+  intake.move(input);
+  targetInput = input;
 }
 
-inline void intakeBrake() { //brakes both intake motors
-    hookIntake.brake();
-    floatingIntake.brake();
+void antiJamCode () {
+  if(isJammed) {
+    if (currState ==1 && ringDetected) {
+      intake.move(127);
+    } else {
+    intake.move(-127);
+    jamCounter += delayTime;
+    if (jamCounter > outtakeTime) {
+      jamCounter = 0;
+      isJammed = false;
+      intake.move(targetInput);
+    }
+   }
+  } 
+  ringDetected = false;
+    if (targetInput >= minSpeed && intake.get_actual_velocity() ==0) {
+    jamCounter += delayTime;
+    if (jamCounter > waitTime) {
+      jamCounter = 0;
+      isJammed = true;
+    }
+  }
+  if (colorSorter.get_hue() > 0 && colorSorter.get_hue() <15 || colorSorter.get_hue() > 100 && colorSorter.get_hue()<250) {
+    ringDetected =true;
+  }
+  
+  if (targetInput <= minSpeed) {
+    jamCounter = 0;
+  }
 }
