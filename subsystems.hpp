@@ -1,37 +1,44 @@
 #pragma once
 
+
 #include "EZ-Template/api.hpp"
 #include "api.h"
 
 extern Drive chassis;
 
-//Motor for subsystems
-inline pros::Motor intake(5,pros::MotorGear::blue);
-inline pros::Motor ladyBrown(-11,pros::MotorGear::red);
+inline pros::Motor ladyBrown(-11,pros::MotorGear::green);
+inline pros::Motor intake(5, pros::MotorGear::blue);  // Make this number negative if you want to reverse the motor
+inline pros::Motor floatingIntake (-6, pros::MotorGear::green); // Make this number negative if you want to reverse the motor
+inline pros::Rotation ladyBrownRotation(15);
 
 //sensors
-inline pros::Rotation ladyBrownRotation(15);
-inline pros::Optical colorSorter(6);
+//inline pros::Rotation ladyBrownRotation(15);
+inline pros::Optical colorSorter(13);
 
 //Pneumatics & 3 wire ports
-inline pros::adi::DigitalOut mogoMech('h', false);
-inline pros::adi::DigitalOut leftDoinker('g', false);
-inline pros::adi::DigitalOut intakeLift('f', false);
+inline pros::adi::DigitalOut mogoMech('g', false);
+inline pros::adi::DigitalOut leftDoinker('f', false);
+inline pros::adi::DigitalOut intakeLift('e', false);
 inline pros::adi::DigitalOut rightDoinker('d', false);
 inline pros::adi::DigitalIn bumper('b');
 
 //variables for sensors
-inline int alliance = 0; // 0 for red, 1 for blue
+inline int alliance = 0; // 0 for no sorting, 1 for red, 2 for blue
+
+void intakeMove(double input);
 
 //variables for antiJamCode
-inline int targetInput =0;
-inline bool isJammed = false;
-inline bool ringDetected = false;
-inline const int waitTime = 30;
-inline const int outtakeTime = 300;
-inline const int minSpeed = 20;
-inline int jamCounter =0;
-inline const int delayTime =10;
+inline int targetInput =0; // target input for intake
+inline bool isJammed = false; // flag to check if the intake is jammed
+inline bool antiJam = true; // flag to check if antiJam is enabled
+inline bool ringDetected = false; // flag to check if a ring is detected
+inline const int waitTime = 40; // time to wait before checking for jam
+inline const int outtakeTime = 200; // time to outtake to unjam intake
+inline const int minSpeed = 20; // minimum speed for intake to work
+inline int jamCounter =0; // counter for jam time
+inline const int delayTime =10; // delay time for antiJamCode and LB reset
+
+
 
 // variables for subsystems
 inline bool enableMogoMech = false;
@@ -40,16 +47,22 @@ inline bool enableRightDoinker = false;
 inline bool enableIntakePiston = false;
 inline int colorSorted =0;
 inline int allianceState = 0;
-                    
+
+
+
+
+
 //pd loop for lift
 inline const int numStates = 7; // number of total states for Lady Brown
-//inline int states[numStates] = {0, 180, 345, 675, 780, 1000, 1050}; // states for Lady Brown 37.5, 156.25, 170, 216, 236 degrees
-inline int states[numStates] = {0, 3900, 8800, 14500, 16000, 20700, 22600}; // states for Lady Brown 37.5, 156.25, 170, 216, 236 degrees
+//inline int states[numStates] = {0, 205, 375, 750, 780, 1000, 1050}; // states for Lady Brown 205, 375, 750, 780, 1000, and 1050 degrees
+inline int states[numStates] = {0, 4700, 9000, 16300, 18500, 20000, 25600}; // states for Lady Brown 30, 88, 145, 160, 207, and 226 degrees
 inline int currState = 0; // current state for Lady Brown
 inline double target = 0; // target for Lady Brown
 inline double prevError = 0; // previous error for Lady Brown
 inline double kP =0.2; // proportional constant for Lady Brown, 5kp for only motor, 0.2
-inline double kD =0.00; // derivative constant for Lady Brown
+inline double kD =0.00; // derivative constant for Lady Brown 
+
+
 
 ///////// Lady Brown Controller
 // Function to move to the next state for Lady Brown
@@ -57,7 +70,7 @@ inline void nextState () {
   // Increment the current state
   currState++;
   
-  // If the current state exceeds the maximum defined states, reset to 0
+  // If the current state exceeds the maximum defined states, reset to 1
   if (currState >= 4) {
     currState = 1;
   }
@@ -77,6 +90,7 @@ inline void mogoUnTilt () {
   target = states[currState];
 }
 
+// Function to reset the position of Lady Brown
 //lift control function
 inline void liftControl () {
   // Calculate the error between the target position and the current position
@@ -89,45 +103,6 @@ inline void liftControl () {
   // Calculate the motor voltage using the PD control formula
   double motorVoltage = ((kP * error) + (kD * derivative)) / 12;
   
-  // Move the motor to the calculated voltage
-  ladyBrown.move(motorVoltage);
-  
-  // Update the previous error for the next iteration
-  prevError = error;
-}
-
-void intakeMove (int input) {
-  intake.move(input);
-  targetInput = input;
-}
-
-void antiJamCode () {
-  if(isJammed) {
-    if (currState ==1 && ringDetected) {
-      intake.move(127);
-    } else {
-    intake.move(-127);
-    jamCounter += delayTime;
-    if (jamCounter > outtakeTime) {
-      jamCounter = 0;
-      isJammed = false;
-      intake.move(targetInput);
-    }
-   }
-  } 
-  ringDetected = false;
-    if (targetInput >= minSpeed && intake.get_actual_velocity() ==0) {
-    jamCounter += delayTime;
-    if (jamCounter > waitTime) {
-      jamCounter = 0;
-      isJammed = true;
-    }
-  }
-  if (colorSorter.get_hue() > 0 && colorSorter.get_hue() <15 || colorSorter.get_hue() > 100 && colorSorter.get_hue()<250) {
-    ringDetected =true;
-  }
-  
-  if (targetInput <= minSpeed) {
-    jamCounter = 0;
-  }
+  ladyBrown.move(motorVoltage); // Set the motor velocity to the calculated output
+  prevError = error; // Update the previous error for the next iteration
 }

@@ -1,5 +1,6 @@
 #include "main.h"
 
+
 /////
 // For installation, upgrading, documentations, and tutorials, check out our website!
 // https://ez-robotics.github.io/EZ-Template/
@@ -8,8 +9,8 @@
 // Chassis constructor
 ez::Drive chassis(
     // These are your drive motors, the first motor is used for sensing!
-    {19, -18, -20},     // Left Chassis Ports (negative port will reverse it!)
-    {-1, 2, 3},  // Right Chassis Ports (negative port will reverse it!)
+    {19, -18, -20},     // Left Chassis Ports (negative port will reverse it!), 19, -18, -20
+    {-1, 2, 3},  // Right Chassis Ports (negative port will reverse it!), -1, 2, 3
 
     12,      // IMU Port
     3.25,  // Wheel Diameter (Remember, 4" wheels without screw holes are actually 4.125!)
@@ -23,26 +24,77 @@ ez::Drive chassis(
  ez::tracking_wheel horiz_tracker(-10, 2, -1.75);  // This tracking wheel is perpendicular to the drive wheels
 // ez::tracking_wheel vert_tracker(9, 2.75, 4.0);   // This tracking wheel is parallel to the drive wheels
 
+// Function to sort objects based on color
 void colorSort () {
-  if (alliance ==1) {
-    if(colorSorter.get_hue() > 0 && colorSorter.get_hue() <15) {
-      pros::delay(0.5);
-      intake.brake();
-      pros::delay(200);
-      intake.move(127);
+  // Check if the alliance is set to 1 (e.g., red alliance)
+  if (alliance == 1) {
+    // If the detected hue is in the range for red (0 to 30)
+    if (colorSorter.get_hue() > 0 && colorSorter.get_hue() < 30) {
+      pros::delay(3); // Small delay before braking the intake
+      intake.brake();   // Stop the intake motor
+      pros::delay(200); // Wait for 200 milliseconds
+      intake.move(127); // Resume intake motor movement
     }
- } else if (alliance  ==2) {
-    if(colorSorter.get_hue() > 100 && colorSorter.get_hue()<250) {
-      pros::delay(1);
-      intake.brake();
-      pros::delay(200);
-      intake.move(127);
+  } 
+  // Check if the alliance is set to 2 (e.g., blue alliance)
+  else if (alliance == 2) {
+    // If the detected hue is in the range for blue (100 to 250)
+    if (colorSorter.get_hue() > 100 && colorSorter.get_hue() < 250) {
+      pros::delay(12);   // Small delay before braking the intake
+      intake.brake();   // Stop the intake motor
+      pros::delay(200); // Wait for 200 milliseconds
+      intake.move(127); // Resume intake motor movement
     }
- } else if (alliance == 0) {
-  //nothing
- }
+  } 
+  // If the alliance is set to 0 (neutral or no sorting)
+  else if (alliance == 0) {
+    // Do nothing
+  }
 }
 
+// Define the intakeMove function
+void intakeMove(double input) {
+  // Move the intake motor with the specified input value
+  intake.move(input);
+  floatingIntake.move(input); // Move the floating intake motor with the same input value
+  
+  // Set the target input value for the intake motor
+  targetInput = input;
+} 
+
+// Define the antiJamCode function
+void antiJamCode() {
+  // Check if the anti-jam mechanism is enabled
+  if (antiJam) {
+    // If the intake is jammed
+    if (isJammed) {
+      intake.move(-127); // Reverse the intake motor to clear the jam
+      jamCounter += delayTime; // Increment the jam counter by the delay time
+      if (jamCounter > outtakeTime) { // If the jam counter exceeds the outtake time
+        jamCounter = 0; // Reset the jam counter
+        isJammed = false; // Mark the intake as no longer jammed
+        intake.move(targetInput); // Resume intake motor movement with the target input
+      }
+    }
+
+    // Check if the intake motor is stalled (target input is above minimum speed but velocity is zero)
+    if (targetInput >= minSpeed && intake.get_actual_velocity() == 0) {
+      jamCounter += delayTime; // Increment the jam counter by the delay time
+      if (jamCounter > waitTime) { // If the jam counter exceeds the wait time
+        jamCounter = 0; // Reset the jam counter
+        isJammed = true; // Mark the intake as jammed
+      }
+    }
+
+    // If the target input is below the minimum speed, reset the jam counter
+    if (targetInput <= minSpeed) {
+      jamCounter = 0;
+    }
+  } else {
+    // If the anti-jam mechanism is disabled, move the intake motor with the target input
+    intake.move(targetInput);
+  }
+} 
 
 
 
@@ -64,7 +116,8 @@ void initialize() {
   chassis.drive_brake_set(MOTOR_BRAKE_HOLD);  // Set motors to hold.  This helps autonomous consistency
 
   //sets rotation  sensor to zero  position and sets it reversed
-  ladyBrownRotation.reset_position();
+  
+  colorSorter.set_integration_time(10);
   colorSorter.set_led_pwm(100);
 
 
@@ -79,9 +132,10 @@ void initialize() {
   // Autonomous Selector using LLEMU
   ez::as::auton_selector.autons_add({
       {"Skills\n\nSkills Auton", skillsAuton},
-      {"State Solo AWP", soloAWPState},
+      {"State Solo AWP", soloAWP},
       {"right side five on mogo\n\nRIght side", rightAutonSixRing},
-      {"Ring Rush\n\nRed Solo AWP", ringRushRight_fourRingMogo},
+      {"Ring Rush \n\nRed Side", ringRushLeft_fiveRingMogo},
+      {"Ring Rush\n\nBlue Side", ringRushRight_fiveRingMogo},
   });
 
   // Initialize chassis and auton selector
@@ -94,7 +148,7 @@ pros::Task colorSortTask([]{
     colorSort();
     pros::delay(10);
     }
-  }); 
+  });
   // Starts Lady Brown PD Loop Control
   pros::Task liftControlTask([]{
     while (true) {
@@ -129,12 +183,6 @@ void disabled() {
  * starts.
  */
 void competition_initialize() {
-  while (true) {
-    if (bumper.get_value() == 1) {
-      ez::as::page_up();
-      pros::delay(300);
-    } 
-  }
 }
 
 void autonomous() {
@@ -254,21 +302,25 @@ void ez_template_extras() {
 void opcontrol() {
   // This is preference to what you like to drive on
   chassis.drive_brake_set(MOTOR_BRAKE_HOLD);  // Set motors to hold.
+  antiJam =  false; // Enable anti-jam mechanism
+  alliance = 0; 
 
   while (true) {
-    //colorSort1();
     // Gives you some extras to make EZ-Template ezier
     ez_template_extras();
     chassis.opcontrol_arcade_standard(ez::SPLIT);  // spilt arcade drive
     
-    // sets up controls for intake
-  if(master.get_digital(pros::E_CONTROLLER_DIGITAL_R1)) { // moves both intake motors forwrard
-    intakeMove(127);
-	 } else if (master.get_digital(pros::E_CONTROLLER_DIGITAL_R2)) { // moves floating intake motor backwards and brakes the hook intake motor
-    intakeMove(-127);
-	 } else { // brakes both motors
-    intakeMove(0);
-	 }
+  
+
+   // sets up controls for intake
+   if(master.get_digital(pros::E_CONTROLLER_DIGITAL_R1)) { // moves both intake motors forwrard
+     intakeMove(127);
+   } else if (master.get_digital(pros::E_CONTROLLER_DIGITAL_R2)) { // moves floating intake motor backwards and brakes the hook intake motor
+            intakeMove(-127);
+   } else { // brakes both motors
+     intakeMove(0);
+   } 
+           
    
   // sets up controls for ladyBrown
   if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_L1)) { // toggle for next state, used for scoring on Wall Stakes
@@ -284,13 +336,12 @@ void opcontrol() {
 
   // sets up controls for allianceState, used for scoring on alliance stakes
   if (allianceState == 1) { // If allianceState is 1, set ladyBrown to directly above alliance stake
-    currState = 4; // Set current state to 3
-    target = states[currState]; // Set target to the state corresponding to currState
-  } else if (allianceState == 2) { // If allianceState is 2, score on alliance stake
-    currState = 5; // Set current state to 4
+    currState = 3; // Set current state to 3
     target = states[currState]; // Set target to the state corresponding to currState
     pros::delay(10); // Delay for 10 milliseconds
     allianceState = 0; // Reset allianceState to 0
+  } else {
+    //nothing
   }
 
   
@@ -336,8 +387,8 @@ void opcontrol() {
     intakeLift.set_value(false); // Disable the Intake Piston
   }
 
-  if (currState == 1) {
-    kP = 0.2;
+  /*if (currState == 1) {
+    kP = 0.35;
     kD = 0.0;
   } else if (currState == 2) {
     kP = 0.25;
@@ -355,9 +406,9 @@ void opcontrol() {
     kP = 0.25;
     kD = 0.05;
   } else {
-    kP = 0.2;
+    kP = 0.35;
     kD = 0.0;
-  } 
+  } */
 
    /*if (currState == 1) {
     kP = 6;

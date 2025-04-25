@@ -3,8 +3,15 @@
 void default_constants();
 
 //my autons
-void driveConstants();
 void skillsAuton();
-void soloAWPState();
+void soloAWP();
 void rightAutonSixRing();
-void ringRushRight_fourRingMogo();
+void ringRushRight_fiveRingMogo();
+void rightSideFourRing();
+void ringRushSwingRight();
+void leftFourRing();
+void leftGoalRush();
+void ringRushSwingLeft();
+void leftThreeRing();
+void ringRushLeft_fiveRingMogo();
+void goalRushAWP();
