@@ -6,9 +6,9 @@
 
 extern Drive chassis;
 
-inline pros::Motor ladyBrown(-11,pros::MotorGear::green);
+//motors 
+inline pros::Motor ladyBrown(11,pros::MotorGear::green);
 inline pros::Motor intake(5, pros::MotorGear::blue);  // Make this number negative if you want to reverse the motor
-inline pros::Motor floatingIntake (-6, pros::MotorGear::green); // Make this number negative if you want to reverse the motor
 inline pros::Rotation ladyBrownRotation(15);
 
 //sensors
@@ -55,7 +55,7 @@ inline int allianceState = 0;
 //pd loop for lift
 inline const int numStates = 7; // number of total states for Lady Brown
 //inline int states[numStates] = {0, 205, 375, 750, 780, 1000, 1050}; // states for Lady Brown 205, 375, 750, 780, 1000, and 1050 degrees
-inline int states[numStates] = {0, 4700, 9000, 16300, 18500, 20000, 25600}; // states for Lady Brown 30, 88, 145, 160, 207, and 226 degrees
+inline int states[numStates] = {0, 3900, 9800, 16300, 17000, 18400, 22500}; // states for Lady Brown 30, 88, 145, 160, 207, and 226 degrees
 inline int currState = 0; // current state for Lady Brown
 inline double target = 0; // target for Lady Brown
 inline double prevError = 0; // previous error for Lady Brown
@@ -96,6 +96,7 @@ inline void liftControl () {
   // Calculate the error between the target position and the current position
   //double error = target - ladyBrown.get_position();
   double error = target - ladyBrownRotation.get_position();
+ 
   
   // Calculate the derivative of the error
   double derivative = error - prevError;

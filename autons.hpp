@@ -14,4 +14,5 @@ void leftGoalRush();
 void ringRushSwingLeft();
 void leftThreeRing();
 void ringRushLeft_fiveRingMogo();
-void goalRushAWP();
+void redPos41();
+void redPos6();
