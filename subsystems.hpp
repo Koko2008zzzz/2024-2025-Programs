@@ -7,12 +7,11 @@
 extern Drive chassis;
 
 //motors 
-inline pros::Motor ladyBrown(11,pros::MotorGear::green);
+inline pros::Motor ladyBrown(11,pros::MotorGear::red);
 inline pros::Motor intake(5, pros::MotorGear::blue);  // Make this number negative if you want to reverse the motor
-inline pros::Rotation ladyBrownRotation(15);
 
 //sensors
-//inline pros::Rotation ladyBrownRotation(15);
+inline pros::Rotation ladyBrownRotation(15);
 inline pros::Optical colorSorter(13);
 
 //Pneumatics & 3 wire ports
@@ -20,7 +19,6 @@ inline pros::adi::DigitalOut mogoMech('g', false);
 inline pros::adi::DigitalOut leftDoinker('f', false);
 inline pros::adi::DigitalOut intakeLift('e', false);
 inline pros::adi::DigitalOut rightDoinker('d', false);
-inline pros::adi::DigitalIn bumper('b');
 
 //variables for sensors
 inline int alliance = 0; // 0 for no sorting, 1 for red, 2 for blue
@@ -42,7 +40,6 @@ inline int allianceState = 0;
 
 //pd loop for lift
 inline const int numStates = 7; // number of total states for Lady Brown
-//inline int states[numStates] = {0, 205, 375, 750, 780, 1000, 1050}; // states for Lady Brown 205, 375, 750, 780, 1000, and 1050 degrees
 inline int states[numStates] = {0, 3900, 9800, 16300, 17000, 18400, 22500}; // states for Lady Brown 30, 88, 145, 160, 207, and 226 degrees
 inline int currState = 0; // current state for Lady Brown
 inline double target = 0; // target for Lady Brown
@@ -82,7 +79,6 @@ inline void mogoUnTilt () {
 //lift control function
 inline void liftControl () {
   // Calculate the error between the target position and the current position
-  //double error = target - ladyBrown.get_position();
   double error = target - ladyBrownRotation.get_position();
  
   

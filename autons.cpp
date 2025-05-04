@@ -524,29 +524,37 @@ void blueNeg61Qual () {
   enableMogoMech = true;
   target = states[currState];
   pros::delay(300);
+  //////////////////////////////
+  //moves towards Mobile Goal
   drive(-5, 110);
-  pros::delay(500); //tune this
+  pros::delay(500);
   moveToPoint(14.25, 37, 110, dir::rev);
-  pros::delay(1050); //930
+  pros::delay(1050);
   mogoMech.set_value(true);
   currState = 0;
   target = states[currState];
   pros::delay(100);
+  /////////////////////////////
+  //moves to score 2 rings
   intakeMove(565);
   moveToPoint(29, 48.5, 110);
   pros::delay(1225);
   moveToPoint(45, 48.5, 110);
-  pros::delay(720);//tune this
+  pros::delay(720);
+  ////////////////////////////
+  //moves backwards to score Ring
   moveToPoint(18, 33, 110, dir::rev);
   wait();
   moveToPoint(30, 31.25, 110);
   wait();
+  ////////////////////////////
+  //lines up with Corner Stack
   drive(-10, 110);
   pros::delay(500);
-  turnToHeading(141.5, 90);//155
+  turnToHeading(141.5, 90);
   currState = 4;
   target = states[currState];
-  pros::delay(400);//tune this
+  pros::delay(400);
   drive(64, 127);
   pros::delay(1759);
   drive(-17, 110);
@@ -555,16 +563,21 @@ void blueNeg61Qual () {
   wait();
   drive(12, 110);
   pros::delay(900);
+  ////////////////////////////
+  //moves to score 6th Ring
   moveToPoint(-10, 13, 127);
   pros::delay(750);
   intakeLift.set_value(true);
   pros::delay(1350);
   intakeLift.set_value(false);
   wait();
+  ////////////////////////////
+  //moves to contact ladder
   moveToPoint(-12, 25, 110);
   pros::delay(250);
   intakeLift.set_value(true);
   wait();
+  ////////////////////////////
 }
 
 
@@ -629,6 +642,8 @@ void redPos41Qual () {
   alliance = 2;
   target = states[currState];
   pros::delay(400);
+  //////////////////////////////
+  //moves towards Mobile Goal
   drive(-5, 110);
   wait(); 
   moveToPoint(14.98, 39, 110, dir::rev);
@@ -637,9 +652,13 @@ void redPos41Qual () {
   currState = 0;
   target = states[currState];
   pros::delay(100);
+  /////////////////////////////
+  //moves to score Ring
   moveToPoint(34.5, 35, 110);
   intakeMove(550);
   wait();
+  ////////////////////////////
+  //moves towards Corner
   moveToPoint(34.5, 10, 110);
   wait();
   turnToHeading(134, 90);
@@ -648,12 +667,16 @@ void redPos41Qual () {
   target = states[currState];
   intakeMove(575);
   wait();
+  ////////////////////////////
+  //moves to score 2 Corner Rings
   drive(45, 127);
   pros::delay(1400);
   drive(-17, 110);
   wait();
   drive(16, 110);
   wait(); 
+  ///////////////////////////
+  //moves towards Ladder
   drive(-24, 110);
   wait();
   turnToHeading(-42, 90);
@@ -666,6 +689,8 @@ void redPos41Qual () {
   intakeMove(0);
   rightDoinker.set_value(true);
   wait();
+  //////////////////////////
+  //moves to contact ladder & score Ring
   drive(-35, 110);
   enableMogoMech = true;
   wait();
@@ -676,6 +701,7 @@ void redPos41Qual () {
   currState =3;
   target = states[currState];
   wait();
+  //////////////////////////
 }
 
 //fully tuned
