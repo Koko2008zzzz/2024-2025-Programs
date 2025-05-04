@@ -56,46 +56,7 @@ void colorSort () {
 void intakeMove(double input) {
   // Move the intake motor with the specified input value
   intake.move_velocity(input);
-  
-  // Set the target input value for the intake motor
-  targetInput = input;
 } 
-
-// Define the antiJamCode function
-void antiJamCode() {
-  // Check if the anti-jam mechanism is enabled
-  if (antiJam) {
-    // If the intake is jammed
-    if (isJammed) {
-      intake.move(-127); // Reverse the intake motor to clear the jam
-      jamCounter += delayTime; // Increment the jam counter by the delay time
-      if (jamCounter > outtakeTime) { // If the jam counter exceeds the outtake time
-        jamCounter = 0; // Reset the jam counter
-        isJammed = false; // Mark the intake as no longer jammed
-        intake.move(targetInput); // Resume intake motor movement with the target input
-      }
-    }
-
-    // Check if the intake motor is stalled (target input is above minimum speed but velocity is zero)
-    if (targetInput >= minSpeed && intake.get_actual_velocity() == 0) {
-      jamCounter += delayTime; // Increment the jam counter by the delay time
-      if (jamCounter > waitTime) { // If the jam counter exceeds the wait time
-        jamCounter = 0; // Reset the jam counter
-        isJammed = true; // Mark the intake as jammed
-      }
-    }
-
-    // If the target input is below the minimum speed, reset the jam counter
-    if (targetInput <= minSpeed) {
-      jamCounter = 0;
-    }
-  } else {
-    // If the anti-jam mechanism is disabled, move the intake motor with the target input
-    intake.move_velocity(targetInput);
-  }
-} 
-
-
 
 
 /**
@@ -130,11 +91,16 @@ void initialize() {
 
   // Autonomous Selector using LLEMU
   ez::as::auton_selector.autons_add({
-      {"Skills\n\nSkills Auton", redPos41},
+      {"Skills\n\nSkills Auton", skillsAuton},
       {"State Solo AWP", soloAWP},
-      {"right side five on mogo\n\nRIght side", rightAutonSixRing},
-      {"Ring Rush \n\nRed Side", ringRushLeft_fiveRingMogo},
-      {"Ring Rush\n\nBlue Side", ringRushRight_fiveRingMogo},
+      {"red neg ring rush\n\n6+1", redNegRush61Elim},
+      {"red pos elim\n\n6+1", redPos6Elim}, //fully tuned
+      {"red pos qual\n\n4+1", redPos41Qual}, //fully tuned
+      {"red neg qual\n\n6+1", redNeg61Qual}, 
+      {"blue neg ring rush\n\n6+1", blueNegRush61Elim},
+      {"blue pos elim\n\n6+1", bluePos6Elim},
+      {"blue pos qual\n\n4+1", bluePos41Qual},
+      {"blue neg qual\n\n6+1", blueNeg61Qual} //fully tuned
   });
 
   // Initialize chassis and auton selector
@@ -155,12 +121,6 @@ pros::Task colorSortTask([]{
       pros::delay(10);
     }
   });
-  /*pros::Task antiJamTask([]{
-    while (true) {
-      antiJamCode();
-      pros::delay(10);
-    }
-  }); */
 }
 
 /**
@@ -301,7 +261,6 @@ void ez_template_extras() {
 void opcontrol() {
   // This is preference to what you like to drive on
   chassis.drive_brake_set(MOTOR_BRAKE_HOLD);  // Set motors to hold.
-  antiJam =  false; // Enable anti-jam mechanism
   alliance = 0; 
 
   while (true) {
@@ -313,7 +272,7 @@ void opcontrol() {
 
    // sets up controls for intake
    if(master.get_digital(pros::E_CONTROLLER_DIGITAL_R1)) { // moves both intake motors forwrard
-     intakeMove(575); // Move the intake motor forward at 450 RPM
+     intakeMove(560); // Move the intake motor forward at 450 RPM
    } else if (master.get_digital(pros::E_CONTROLLER_DIGITAL_R2)) { // moves floating intake motor backwards and brakes the hook intake motor
       intakeMove(-600);
    } else { // brakes both motors
@@ -386,53 +345,6 @@ void opcontrol() {
   } else {
     intakeLift.set_value(false); // Disable the Intake Piston
   }
-
- /* if (currState == 1) {
-    kP = 0.35;
-    kD = 0.0;
-  } else if (currState == 2) {
-    kP = 0.25;
-    kD = 0.05;
-  } else if (currState == 3) {
-    kP = 0.25;
-    kD = 0.05;
-  } else if (currState == 4) {
-    kP = 0.25;
-    kD = 0.05;
-  } else if (currState == 5) {
-    kP = 0.25;
-    kD = 0.05;
-  } else if (currState == 6) {
-    kP = 0.25;
-    kD = 0.05;
-  } else {
-    kP = 0.2;
-    kD = 0.0;
-  } */
-
-   /*if (currState == 1) {
-    kP = 6;
-    kD = 0.0;
-  } else if (currState == 2) {
-    kP = 15;
-    kD = 0.0;
-  } else if (currState == 3) {
-    kP = 8;
-    kD = 0.0;
-  } else if (currState == 4) {
-    kP = 6;
-    kD = 0.0;
-  } else if (currState == 5) {
-    kP = 8;
-    kD = 0.0;
-  } else if (currState == 6) {
-    kP = 3.5;
-    kD = 0.0;
-  } else {
-    kP = 6;
-    kD = 0.0;
-  } */
-
 
    pros::delay(ez::util::DELAY_TIME);  // Delay to prevent the CPU from getting overwhelmed
   }

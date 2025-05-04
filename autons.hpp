@@ -2,17 +2,22 @@
 
 void default_constants();
 
-//my autons
+//Skills and Solo AWP
 void skillsAuton();
 void soloAWP();
-void rightAutonSixRing();
-void ringRushRight_fiveRingMogo();
-void rightSideFourRing();
-void ringRushSwingRight();
-void leftFourRing();
-void leftGoalRush();
-void ringRushSwingLeft();
-void leftThreeRing();
-void ringRushLeft_fiveRingMogo();
-void redPos41();
-void redPos6();
+
+//Red Elim Autons
+void redNegRush61Elim();
+void redPos6Elim();
+
+//Red Quals Autons
+void redNeg61Qual();
+void redPos41Qual();
+
+//Blue Elim Autons
+void blueNegRush61Elim();
+void bluePos6Elim();
+
+//Blue Quals Autons
+void blueNeg61Qual();
+void bluePos41Qual();

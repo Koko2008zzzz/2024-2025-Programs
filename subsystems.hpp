@@ -27,18 +27,6 @@ inline int alliance = 0; // 0 for no sorting, 1 for red, 2 for blue
 
 void intakeMove(double input);
 
-//variables for antiJamCode
-inline int targetInput =0; // target input for intake
-inline bool isJammed = false; // flag to check if the intake is jammed
-inline bool antiJam = true; // flag to check if antiJam is enabled
-inline bool ringDetected = false; // flag to check if a ring is detected
-inline const int waitTime = 40; // time to wait before checking for jam
-inline const int outtakeTime = 200; // time to outtake to unjam intake
-inline const int minSpeed = 20; // minimum speed for intake to work
-inline int jamCounter =0; // counter for jam time
-inline const int delayTime =10; // delay time for antiJamCode and LB reset
-
-
 
 // variables for subsystems
 inline bool enableMogoMech = false;
